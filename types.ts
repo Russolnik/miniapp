@@ -1,25 +1,33 @@
-// Типы для генерации изображений
-export type Model = 'imagen-4.0-generate-001' | 'gemini-2.5-flash-image';
-export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+// Типы для генерации изображений (обновлены по образцу gemini-image-chat)
+export enum MessageRole {
+  USER = 'user',
+  MODEL = 'model',
+  ERROR = 'error',
+}
+
+export type AspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 
 export interface UserMessage {
-  role: 'user';
+  role: MessageRole.USER;
   prompt: string;
-  referenceImages?: { name: string; type: string }[];
+  referenceImages: string[]; // base64 data URLs
 }
 
 export interface ModelMessage {
-  role: 'model';
-  imageUrl: string;
-  mimeType: string;
+  role: MessageRole.MODEL;
+  generatedImages: string[]; // base64 data URLs
 }
 
+export interface ErrorMessage {
+  role: MessageRole.ERROR;
+  content: string;
+}
+
+export type ChatMessage = UserMessage | ModelMessage | ErrorMessage;
+
+// Старые типы для совместимости
+export type Model = 'imagen-4.0-generate-001' | 'gemini-2.5-flash-image';
 export type HistoryItem = UserMessage | ModelMessage;
-
-export interface ChatMessage {
-  role: 'user' | 'model';
-  parts: { text: string }[];
-}
 
 // Типы для Live общения
 export enum Speaker {
