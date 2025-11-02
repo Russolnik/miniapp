@@ -94,11 +94,12 @@ async function getApiUrl() {
     return await apiUrlCheckPromise;
 }
 
-// Загрузка данных пользователя с сервера
+// Загрузка данных пользователя с сервера (обновленная версия с initData)
 async function loadUserDataFromServer() {
-    // Получаем telegram_id из Telegram WebApp
+    // Получаем telegram_id и initData из Telegram WebApp
     let telegramId = null;
     let telegramUser = null;
+    let initData = null;
     
     if (tg?.initDataUnsafe?.user) {
         // Используем данные из initDataUnsafe (основной способ)
@@ -106,6 +107,7 @@ async function loadUserDataFromServer() {
         telegramId = telegramUser.id;
     } else if (tg?.initData) {
         // Если initDataUnsafe не доступен, пробуем парсить initData
+        initData = tg.initData;
         try {
             const urlParams = new URLSearchParams(tg.initData);
             const userStr = urlParams.get('user');
@@ -123,7 +125,8 @@ async function loadUserDataFromServer() {
         currentUser = {
             telegramId: null,
             firstName: 'Пользователь',
-            username: null
+            username: null,
+            photoUrl: null
         };
         updateUserUI(currentUser, null);
         return;
@@ -132,64 +135,62 @@ async function loadUserDataFromServer() {
     // Базовые данные из Telegram (используем как fallback)
     const telegramUsername = telegramUser.username;
     const telegramFirstName = telegramUser.first_name || 'Пользователь';
+    const telegramPhotoUrl = telegramUser.photo_url || null;
 
-    // Начальные данные из Telegram (будут перезаписаны данными с сервера)
+    // Начальные данные из Telegram (будут обновлены данными с сервера)
     currentUser = {
         telegramId: telegramId,
         firstName: telegramFirstName,
         username: telegramUsername || null,
-        photoUrl: null // Будет получено с сервера
+        photoUrl: telegramPhotoUrl
     };
 
     const apiUrl = await getApiUrl();
     
     try {
-        // Загружаем данные пользователя с сервера (сервер получает их из Telegram при /start)
-        const userResponse = await fetch(`${apiUrl}/api/user/data`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ telegram_id: telegramId }),
-        });
-
-        if (userResponse.ok) {
-            const userData = await userResponse.json();
-            if (userData.user) {
-                // Используем данные с сервера (они получены при активации бота)
-                currentUser = {
-                    telegramId: userData.user.telegram_id,
-                    firstName: userData.user.first_name || telegramFirstName,
-                    username: userData.user.username || telegramUsername || null,
-                    photoUrl: userData.user.photo_url || null
-                };
-                console.log('✅ Данные пользователя получены с сервера:', {
-                    username: currentUser.username ? `@${currentUser.username}` : 'не указан',
-                    firstName: currentUser.firstName,
-                    hasPhoto: !!currentUser.photoUrl
-                });
-            } else {
-                console.warn('⚠️ Пользователь не найден на сервере, используем данные Telegram');
-            }
-        } else {
-            console.warn('⚠️ Ошибка получения данных с сервера, используем данные Telegram');
-        }
-
-        // Загружаем статус подписки с сервера
-        const subResponse = await fetch(`${apiUrl}/api/user/subscription`, {
+        // Загружаем данные пользователя и статус подписки с сервера через новый endpoint
+        const initDataForServer = tg?.initData || initData;
+        const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ 
                 telegram_id: telegramId,
-                username: username
+                initData: initDataForServer
             }),
         });
 
-        if (subResponse.ok) {
-            const subData = await subResponse.json();
-            userSubscription = subData.has_subscription ? subData.subscription : null;
+        if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            
+            // Обновляем данные пользователя
+            if (statusData.user) {
+                currentUser = {
+                    telegramId: statusData.user.telegram_id,
+                    firstName: statusData.user.first_name || telegramFirstName,
+                    username: statusData.user.username || telegramUsername || null,
+                    photoUrl: statusData.user.photo_url || telegramPhotoUrl || null
+                };
+                
+                console.log('✅ Данные пользователя получены с сервера:', {
+                    username: currentUser.username ? `@${currentUser.username}` : 'не указан',
+                    firstName: currentUser.firstName,
+                    hasPhoto: !!currentUser.photoUrl
+                });
+            }
+            
+            // Обновляем статус подписки
+            if (statusData.subscription) {
+                userSubscription = statusData.subscription;
+            }
+            
+            // Обновляем статус пробного периода (для информации)
+            if (statusData.trial) {
+                console.log('🎁 Статус пробного периода:', statusData.trial);
+            }
+        } else {
+            console.warn('⚠️ Ошибка получения статуса с сервера, используем данные Telegram');
         }
 
     } catch (error) {
@@ -203,23 +204,34 @@ async function loadUserDataFromServer() {
 // Обновление UI пользователя
 function updateUserUI(user, subscription) {
     const userNameEl = document.getElementById('user-name');
+    const userUsernameEl = document.getElementById('user-username');
     const userAvatarEl = document.getElementById('user-avatar');
     const subscriptionStatusEl = document.getElementById('subscription-status');
 
     if (userNameEl) {
-        // Показываем только first_name (имя, например "Михаил", "Авигея")
+        // Показываем first_name (имя, например "Михаил", "Авигея") - приоритетно
         const displayName = user?.firstName || user?.first_name || 'Пользователь';
         userNameEl.textContent = displayName;
+    }
+
+    if (userUsernameEl) {
+        // Показываем username если есть (например @rusolnik)
+        if (user?.username) {
+            userUsernameEl.textContent = `@${user.username}`;
+            userUsernameEl.style.display = 'block';
+        } else {
+            userUsernameEl.style.display = 'none';
+        }
     }
 
     if (userAvatarEl) {
         // Если есть фото из Telegram, показываем его
         if (user?.photoUrl) {
-            userAvatarEl.innerHTML = `<img src="${user.photoUrl}" alt="Аватар пользователя" class="user-avatar-img" />`;
+            userAvatarEl.innerHTML = `<img src="${user.photoUrl}" alt="Аватар пользователя" class="user-avatar-img" onerror="this.parentElement.innerHTML='${user?.firstName?.[0]?.toUpperCase() || '👤'}'; this.parentElement.classList.remove('has-photo');" />`;
             userAvatarEl.classList.add('has-photo');
         } else {
             // Иначе показываем первую букву имени или эмодзи
-            const initial = user?.firstName?.[0]?.toUpperCase() || '👤';
+            const initial = user?.firstName?.[0]?.toUpperCase() || user?.first_name?.[0]?.toUpperCase() || '👤';
             userAvatarEl.innerHTML = initial;
             userAvatarEl.classList.remove('has-photo');
         }
@@ -228,11 +240,23 @@ function updateUserUI(user, subscription) {
     if (subscriptionStatusEl) {
         if (subscription && subscription.is_active) {
             const daysLeft = subscription.days_left || 0;
-            subscriptionStatusEl.textContent = `💎 Подписка активна (${daysLeft} дн.)`;
+            const hoursLeft = subscription.hours_left || 0;
+            
+            // Форматируем текст статуса
+            let statusText = '';
+            if (daysLeft > 0) {
+                statusText = `💎 Подписка активна (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
+            } else if (hoursLeft > 0) {
+                statusText = `💎 Подписка активна (${Math.floor(hoursLeft)} ч.)`;
+            } else {
+                statusText = '💎 Подписка активна';
+            }
+            
+            subscriptionStatusEl.textContent = statusText;
             subscriptionStatusEl.className = 'subscription-status-text active';
         } else {
-            subscriptionStatusEl.textContent = '✅ Все функции доступны';
-            subscriptionStatusEl.className = 'subscription-status-text active';
+            subscriptionStatusEl.textContent = '❌ Подписка не активна';
+            subscriptionStatusEl.className = 'subscription-status-text inactive';
         }
     }
 }

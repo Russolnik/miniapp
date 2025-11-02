@@ -17,15 +17,7 @@
         const maskedUrl = window.API_URL ? `***${window.API_URL.slice(-15)}` : 'не установлен';
         console.log('🌐 API URL установлен:', maskedUrl);
         
-        // Устанавливаем env переменные для Netlify (если доступны)
-        if (typeof window !== 'undefined' && !window.ENV) {
-            window.ENV = {};
-        }
-        // Явный fallback ключ (на случай если плагин не сработал)
-        if (typeof window !== 'undefined' && !window.ENV.GEMINI_API_KEY) {
-            window.ENV.GEMINI_API_KEY = 'AIzaSyBscpJYM-ZPFmvihUrbnaupQhEOjAAlyjo';
-            console.log('✅ Fallback API ключ установлен явно в HTML');
-        }
+        // API ключ теперь получается из БД через сервер, не встраиваем в HTML
     </script>
     <!-- Importmap как в оригинальном проекте -->
     <script type="importmap">

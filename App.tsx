@@ -314,6 +314,11 @@ async function getUserApiKey(): Promise<string | null> {
       return null;
     }
     
+    // Получаем initData для валидации на сервере (безопасность)
+    const initData = webApp?.initData || null;
+    const hasInitData = !!initData;
+    console.log('🔐 initData для валидации:', hasInitData ? `✅ присутствует (${initData.length} символов)` : '❌ отсутствует');
+    
     // Маскируем telegram_id и URL в логах
     const maskedTelegramId = telegramId ? `***${String(telegramId).slice(-4)}` : 'неизвестен';
     const maskUrl = (url: string) => url ? `***${url.slice(-15)}` : 'не установлен';
@@ -321,13 +326,24 @@ async function getUserApiKey(): Promise<string | null> {
     console.log('📤 Запрос API ключа для пользователя:', maskedTelegramId);
     console.log('🔗 URL запроса:', maskUrl(fullApiUrl));
     
+    // Формируем тело запроса с initData для валидации
+    const requestBody: { telegram_id: number; initData?: string } = { 
+      telegram_id: telegramId 
+    };
+    if (initData) {
+      requestBody.initData = initData;
+      console.log('🔐 Добавляем initData для валидации на сервере');
+    } else {
+      console.warn('⚠️ initData отсутствует - запрос может быть отклонен сервером');
+    }
+    
     console.log('📤 Отправка запроса на получение API ключа...');
     const response = await fetch(fullApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ telegram_id: telegramId }),
+      body: JSON.stringify(requestBody),
     });
     
     console.log('📥 Ответ сервера получен:', {

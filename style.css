@@ -978,7 +978,14 @@ header h1 {
     font-size: 20px;
     font-weight: 700;
     color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.user-username {
+    font-size: 14px;
+    color: var(--text-secondary);
     margin-bottom: 8px;
+    font-weight: 400;
 }
 
 .subscription-status-text {
