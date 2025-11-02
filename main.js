@@ -181,7 +181,7 @@ async function loadUserDataFromServer() {
 
 // Обновление доступности карточек режимов в зависимости от подписки
 function updateModeCardsAccess(subscription) {
-    const hasActiveSubscription = subscription && subscription.is_active;
+    const hasActiveSubscription = subscription && (subscription.is_active || subscription.is_trial);
     
     // Карточка Live
     const liveCard = document.querySelector('.mode-card[onclick*="openLivePage"], .mode-card:has(.mode-icon:contains("🗣️"))');
@@ -255,7 +255,11 @@ function updateModeCardsAccess(subscription) {
 
 // Функция проверки подписки перед открытием страницы
 function checkSubscriptionAndOpen(page) {
-    if (!userSubscription || !userSubscription.is_active) {
+    // Проверяем подписку или пробный период
+    const hasActiveSub = userSubscription && userSubscription.is_active;
+    const isTrial = userSubscription && userSubscription.is_trial;
+    
+    if (!hasActiveSub && !isTrial) {
         const message = '🚫 **Доступ ограничен**\n\n' +
             'Для использования этого раздела требуется активная подписка.\n\n' +
             'Используйте команду /subscription в боте для оформления подписки.';
@@ -316,18 +320,32 @@ function updateUserUI(user, subscription) {
     }
 
     if (subscriptionStatusEl) {
-        if (subscription && subscription.is_active) {
+        // Проверяем подписку или пробный период
+        const hasActiveSub = subscription && subscription.is_active;
+        const isTrial = subscription && subscription.is_trial;
+        
+        if (hasActiveSub || isTrial) {
             const daysLeft = subscription.days_left || 0;
             const hoursLeft = subscription.hours_left || 0;
             
             // Форматируем текст статуса
             let statusText = '';
-            if (daysLeft > 0) {
-                statusText = `💎 Подписка активна (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
-            } else if (hoursLeft > 0) {
-                statusText = `💎 Подписка активна (${Math.floor(hoursLeft)} ч.)`;
+            if (isTrial) {
+                if (daysLeft > 0) {
+                    statusText = `🎁 Пробный период (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
+                } else if (hoursLeft > 0) {
+                    statusText = `🎁 Пробный период (${Math.floor(hoursLeft)} ч.)`;
+                } else {
+                    statusText = '🎁 Пробный период';
+                }
             } else {
-                statusText = '💎 Подписка активна';
+                if (daysLeft > 0) {
+                    statusText = `💎 Подписка активна (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
+                } else if (hoursLeft > 0) {
+                    statusText = `💎 Подписка активна (${Math.floor(hoursLeft)} ч.)`;
+                } else {
+                    statusText = '💎 Подписка активна';
+                }
             }
             
             subscriptionStatusEl.textContent = statusText;
@@ -341,8 +359,11 @@ function updateUserUI(user, subscription) {
 
 // Переход на страницу Live - с проверкой подписки
 function openLivePage() {
-    // Проверяем подписку перед доступом
-    if (!userSubscription || !userSubscription.is_active) {
+    // Проверяем подписку или пробный период перед доступом
+    const hasActiveSub = userSubscription && userSubscription.is_active;
+    const isTrial = userSubscription && userSubscription.is_trial;
+    
+    if (!hasActiveSub && !isTrial) {
         const message = '🚫 **Доступ ограничен**\n\n' +
             'Для использования Live общения требуется активная подписка.\n\n' +
             'Используйте команду /subscription в боте для оформления подписки.';
@@ -367,8 +388,23 @@ function openLivePage() {
 
 // Переход на страницу генерации - с проверкой подписки
 function openGenerationPage() {
-    // Проверяем подписку перед доступом
-    if (!userSubscription || !userSubscription.is_active) {
+    // Generation пока в разработке для всех
+    const message = '🚫 **Доступ ограничен**\n\n' +
+        'Генерация изображений временно недоступна.\n\n' +
+        'Мы работаем над этим функционалом.';
+    
+    if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(message);
+    } else {
+        alert(message);
+    }
+    return false;
+    
+    // Проверяем подписку или пробный период перед доступом
+    const hasActiveSub = userSubscription && userSubscription.is_active;
+    const isTrial = userSubscription && userSubscription.is_trial;
+    
+    if (!hasActiveSub && !isTrial) {
         const message = '🚫 **Доступ ограничен**\n\n' +
             'Для использования генерации изображений требуется активная подписка.\n\n' +
             'Используйте команду /subscription в боте для оформления подписки.';
