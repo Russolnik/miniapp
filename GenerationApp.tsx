@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Modality } from '@google/genai';
 import type { HistoryItem, Model, AspectRatio, UserMessage, ModelMessage } from './types';
 import { fileToBase64 } from './utils/fileUtils';
-import { proxyGenerateImages, proxyGenerateContent } from './utils/netlifyProxy';
 import Spinner from './components/shared/Spinner';
 import ImageModal from './components/ImageModal';
 import './App.css';
@@ -128,29 +127,34 @@ const GenerationApp: React.FC = () => {
             let imageUrl: string = '';
             let mimeType: string = 'image/png';
 
-            // Используем Netlify Function для проксирования (обход блокировок в РФ/Беларуси)
+            // Используем прямое подключение к GoogleGenAI
+            const ai = new GoogleGenAI({ apiKey });
+            
             if (model === 'imagen-4.0-generate-001') {
                  if (referenceImages.length > 0) throw new Error("Imagen-4 не поддерживает референсные изображения. Пожалуйста, удалите их или переключитесь на Gemini Flash Image.");
-                console.log('🌐 Использую Netlify Function для проксирования запроса к Imagen 4');
-                const response = await proxyGenerateImages(apiKey, model, prompt, {
-                    numberOfImages: 1,
-                    outputMimeType: 'image/png',
-                    aspectRatio,
+                console.log('🔗 Использую прямое подключение к Imagen 4');
+                const response = await ai.generateImages({
+                    model,
+                    prompt,
+                    config: {
+                        numberOfImages: 1,
+                        outputMimeType: 'image/png',
+                        aspectRatio,
+                    },
                 });
                 imageUrl = `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
             } else {
-                // gemini-2.5-flash-image - используем прокси через Netlify
-                console.log('🌐 Использую Netlify Function для проксирования запроса к Gemini Flash Image');
+                // gemini-2.5-flash-image - прямое подключение
+                console.log('🔗 Использую прямое подключение к Gemini Flash Image');
                 const imageParts = await Promise.all(referenceImages.map(async (file) => ({
                     inlineData: { data: await fileToBase64(file), mimeType: file.type },
                 })));
 
-                const response = await proxyGenerateContent(
-                    apiKey,
+                const response = await ai.generateContent({
                     model,
-                    { parts: [{ text: prompt }, ...imageParts] },
-                    { responseModalities: [Modality.IMAGE] }
-                );
+                    contents: [{ parts: [{ text: prompt }, ...imageParts] }],
+                    config: { responseModalities: [Modality.IMAGE] },
+                });
                 
                 const part = response.candidates?.[0]?.content?.parts?.[0];
                 if (part && 'inlineData' in part && part.inlineData) {
