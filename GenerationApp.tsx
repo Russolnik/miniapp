@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Modality } from '@google/genai';
 import type { HistoryItem, Model, AspectRatio, UserMessage, ModelMessage } from './types';
 import { fileToBase64 } from './utils/fileUtils';
+import { generateImage, ModelType } from './services/geminiService';
 import Spinner from './components/shared/Spinner';
 import ImageModal from './components/ImageModal';
 import './App.css';
@@ -105,16 +105,26 @@ const GenerationApp: React.FC = () => {
     };
 
     const handleGenerate = async () => {
-        if (!prompt.trim()) {
-            setError('Пожалуйста, введите промпт.');
+        if (!prompt.trim() && referenceImages.length === 0) {
+            setError('Пожалуйста, введите промпт или прикрепите изображение.');
             return;
         }
         if (!apiKey) {
             setError('API ключ не найден. Пожалуйста, обновите страницу.');
             return;
         }
+        
+        // Проверка для Imagen 4
+        if (model === 'imagen-4.0-generate-001' && referenceImages.length > 0) {
+            setError('Imagen-4 не поддерживает референсные изображения. Пожалуйста, удалите их или переключитесь на Gemini Flash Image.');
+            return;
+        }
+        
         setLoading(true);
         setError('');
+
+        // Преобразуем файлы в data URLs (как в gemini-image-chat)
+        const referenceImageUrls = await Promise.all(referenceImages.map(fileToBase64));
 
         const userMessage: UserMessage = {
             role: 'user',
@@ -124,49 +134,24 @@ const GenerationApp: React.FC = () => {
         setHistory(prev => [...prev, userMessage]);
 
         try {
-            let imageUrl: string = '';
-            let mimeType: string = 'image/png';
+            // Используем сервис из gemini-image-chat
+            console.log(`🔗 Генерация изображения: модель ${model}, соотношение ${aspectRatio}`);
+            const generatedImages = await generateImage(
+                apiKey,
+                prompt,
+                aspectRatio,
+                model as ModelType,
+                referenceImageUrls
+            );
 
-            // Используем прямое подключение к GoogleGenAI
-            const ai = new GoogleGenAI({ apiKey });
-            
-            if (model === 'imagen-4.0-generate-001') {
-                 if (referenceImages.length > 0) throw new Error("Imagen-4 не поддерживает референсные изображения. Пожалуйста, удалите их или переключитесь на Gemini Flash Image.");
-                console.log('🔗 Использую прямое подключение к Imagen 4');
-                const response = await ai.generateImages({
-                    model,
-                    prompt,
-                    config: {
-                        numberOfImages: 1,
-                        outputMimeType: 'image/png',
-                        aspectRatio,
-                    },
-                });
-                imageUrl = `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
-            } else {
-                // gemini-2.5-flash-image - прямое подключение
-                console.log('🔗 Использую прямое подключение к Gemini Flash Image');
-                const imageParts = await Promise.all(referenceImages.map(async (file) => ({
-                    inlineData: { data: await fileToBase64(file), mimeType: file.type },
-                })));
-
-                const response = await ai.generateContent({
-                    model,
-                    contents: [{ parts: [{ text: prompt }, ...imageParts] }],
-                    config: { responseModalities: [Modality.IMAGE] },
-                });
-                
-                const part = response.candidates?.[0]?.content?.parts?.[0];
-                if (part && 'inlineData' in part && part.inlineData) {
-                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    mimeType = part.inlineData.mimeType;
-                } else {
-                    throw new Error('Изображение не получено от API.');
-                }
+            // Создаем сообщение для каждого сгенерированного изображения
+            for (const imageUrl of generatedImages) {
+                const mimeType = imageUrl.includes('data:image/') 
+                    ? imageUrl.split(';')[0].split(':')[1] 
+                    : 'image/png';
+                const modelMessage: ModelMessage = { role: 'model', imageUrl, mimeType };
+                setHistory(prev => [...prev, modelMessage]);
             }
-            
-            const modelMessage: ModelMessage = { role: 'model', imageUrl, mimeType };
-            setHistory(prev => [...prev, modelMessage]);
 
         } catch (err: any) {
             console.error('Ошибка генерации:', err);
