@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>О проекте - YOURAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body>
+    <!-- Маленькие анимированные облачка с 3D эффектом -->
+    <div class="mini-cloud cloud-1">☁️</div>
+    <div class="mini-cloud cloud-2">☁️</div>
+    <div class="mini-cloud cloud-3">☁️</div>
+    <div class="mini-cloud cloud-4">☁️</div>
+    <div class="mini-cloud cloud-5">☁️</div>
+    <div class="mini-cloud cloud-6">☁️</div>
+    <div class="mini-cloud cloud-7">☁️</div>
+    
+    <div class="container">
+        <!-- Кнопка переключения темы -->
+        <button class="theme-toggle-btn" onclick="window.themeManager.toggleTheme()" title="Переключить тему">
+            <span id="theme-icon">🌓</span>
+        </button>
+        
+        <!-- Кнопка "Назад" -->
+        <button class="back-btn" onclick="goBack()">
+            ← Назад
+        </button>
+
+        <!-- Заголовок -->
+        <header class="about-header">
+            <h1>☁️Твой</h1>
+            <p class="subtitle">персональный помощник на основе Google Gemini</p>
+        </header>
+
+        <!-- Основной контент -->
+        <div class="about-content">
+            <!-- О проекте -->
+            <section class="about-section">
+                <h2>📋 О проекте</h2>
+                <p>
+                    YOURAI — Telegram-бот с интеграцией Gemini, 
+                    который поможет в самых разных задачах. Бот поддерживает работу 
+                    с текстом, голосовыми сообщениями, изображениями и файлами.
+                </p>
+            </section>
+
+            <!-- Возможности -->
+            <section class="about-section">
+                <h2>✨ Возможности</h2>
+                <ul class="features-list">
+                    <li>💬 Текстовый чат с AI</li>
+                    <li>🎙️ Обработка голосовых сообщений</li>
+                    <li>📷 Анализ фотографий</li>
+                    <li>🎨 Генерация изображений</li>
+                    <li>📄 Работа с файлами (PDF, TXT) до 200 МБ</li>
+                    <li>⚙️ Персонализация ответов</li>
+                </ul>
+            </section>
+
+            <!-- Контакты -->
+            <section class="about-section">
+                <h2>🤙 Связь</h2>
+                <div class="contact-info">
+                    <p><strong>Создатель проекта:</strong></p>
+                    <a href="tg://resolve?domain=rusolnik" class="contact-link" onclick="openTelegramUser(event, 'rusolnik')">@rusolnik</a>
+                    <p class="contact-note">
+                        По всем вопросам, предложениям и обратной связи пишите создателю проекта.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Поддержка и реклама -->
+            <section class="about-section">
+                <h2>💎 Поддержать проект</h2>
+                <p>
+                    Если вам понравился проект и вы хотите поддержать его развитие, 
+                    свяжитесь с создателем для обсуждения возможностей сотрудничества, 
+                    размещения рекламы или других вопросов.
+                </p>
+                <div class="support-box">
+                    <p><strong>📧 Вот сюда:</strong></p>
+                    <a href="tg://resolve?domain=rusolnik" class="contact-link" onclick="openTelegramUser(event, 'rusolnik')">@rusolnik</a>
+                </div>
+            </section>
+        </div>
+
+        <!-- Футер -->
+        <footer class="about-footer">
+            <p>Делал с 🩵</p>
+            <p class="version">Версия 1.0</p>
+        </footer>
+    </div>
+
+    <script>
+        // Функции для страницы "О проекте"
+        function goBack() {
+            window.location.href = 'main.html';
+        }
+        
+        function openTelegramUser(event, username) {
+            event.preventDefault();
+            const tg = window.Telegram?.WebApp;
+            
+            if (tg) {
+                const url = `https://t.me/${username}`;
+                tg.openLink(url);
+            } else {
+                const url = `https://t.me/${username}`;
+                window.open(url, '_blank');
+            }
+            
+            return false;
+        }
+        
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+        
+        window.goBack = goBack;
+        window.openTelegramUser = openTelegramUser;
+    </script>
+</body>
+</html>
+

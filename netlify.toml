@@ -1,0 +1,47 @@
+# Редирект корня на главную страницу
+[[redirects]]
+  from = "/"
+  to = "/main.html"
+  status = 301
+
+# Редирект index.html на main.html
+[[redirects]]
+  from = "/index.html"
+  to = "/main.html"
+  status = 301
+
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Настройки функций Netlify
+[functions]
+  # Регион для выполнения функций (US East - работает для обхода блокировок)
+  # Важно: Функции будут выполняться в US, поэтому запросы к Google API пойдут не из РФ/Беларуси
+  region = "us-east-2"
+  
+  # Таймаут для функций (в секундах)
+  timeout = 60
+  
+  # Память для функций (в MB)
+  memory = 1024
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "ALLOW-FROM https://web.telegram.org"
+    X-Content-Type-Options = "nosniff"
+    Content-Security-Policy = "default-src 'self' https://telegram.org https://cdn.jsdelivr.net https://aistudiocdn.com https://cdn.tailwindcss.com https://tg-ai-f9rj.onrender.com; script-src 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net https://aistudiocdn.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://tg-ai-f9rj.onrender.com https://*.onrender.com wss://*.onrender.com ws://*.onrender.com https://generativelanguage.googleapis.com wss://generativelanguage.googleapis.com https://*.netlify.app https://*.netlify.functions;"
+
+[build.environment]
+  # API URL для сервера
+  # VITE_API_URL = "https://tg-ai-f9rj.onrender.com"
+  
+  # Gemini API ключ (для fallback, если сервер недоступен)
+  # В Netlify настройте переменную окружения VITE_GEMINI_API_KEY в панели управления
+  # Или используйте MGEMINI_API_KEYS (возьмется первый ключ из списка)
+  # Это будет использоваться только если не удалось получить ключ с сервера или нет Telegram ID
+  # 
+  # Важно: Переменная VITE_GEMINI_API_KEY будет встроена в HTML во время сборки
+  # Можно использовать первый ключ из MGEMINI_API_KEYS если VITE_GEMINI_API_KEY не установлен

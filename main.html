@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>YOURAI - Главная</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Устанавливаем API URL для продакшена -->
+    <script>
+        // Устанавливаем API URL для Netlify продакшена
+        if (!window.API_URL) {
+            window.API_URL = 'https://tg-ai-f9rj.onrender.com';
+        }
+        // Маскируем URL в логах
+        const maskedUrl = window.API_URL ? `***${window.API_URL.slice(-15)}` : 'не установлен';
+        console.log('🌐 API URL установлен:', maskedUrl);
+        
+        // Устанавливаем fallback API ключ явно
+        if (typeof window !== 'undefined' && !window.ENV) {
+            window.ENV = {};
+        }
+        if (typeof window !== 'undefined' && !window.ENV.GEMINI_API_KEY) {
+            window.ENV.GEMINI_API_KEY = 'AIzaSyBscpJYM-ZPFmvihUrbnaupQhEOjAAlyjo';
+            console.log('✅ Fallback API ключ установлен явно в HTML');
+        }
+    </script>
+    <script src="theme.js"></script>
+</head>
+<body>
+    <!-- Анимированные облачка -->
+    <div class="mini-cloud cloud-1">☁️</div>
+    <div class="mini-cloud cloud-2">☁️</div>
+    <div class="mini-cloud cloud-3">☁️</div>
+    <div class="mini-cloud cloud-4">☁️</div>
+    <div class="mini-cloud cloud-5">☁️</div>
+    <div class="mini-cloud cloud-6">☁️</div>
+    <div class="mini-cloud cloud-7">☁️</div>
+    
+    <div class="container">
+        <!-- Кнопка переключения темы -->
+        <button class="theme-toggle-btn" onclick="window.themeManager.toggleTheme()" title="Переключить тему">
+            <span id="theme-icon">🌓</span>
+        </button>
+        
+        <!-- Кнопка "О проекте" сверху слева -->
+        <button class="about-btn" onclick="showAboutPage()">
+            ℹ️ О проекте
+        </button>
+
+        <!-- Статус подписки и информация о пользователе -->
+        <div id="user-info-card" class="user-info-card">
+            <div class="user-avatar" id="user-avatar">👤</div>
+            <div class="user-details">
+                <h2 id="user-name">Загрузка...</h2>
+                <div id="subscription-status" class="subscription-status-text">
+                    Загрузка статуса...
+                </div>
+            </div>
+        </div>
+
+        <!-- Заголовок главной страницы -->
+        <header class="main-header">
+            <h1>☁️ YOUR AI</h1>
+            <p class="subtitle">Выберите режим работы</p>
+        </header>
+
+        <!-- Выбор режима -->
+        <div class="mode-selection-main">
+            <div class="mode-card" onclick="openLivePage()">
+                <div class="mode-icon">🗣️</div>
+                <h3>Live общение</h3>
+                <p>Голосовое общение с AI через микрофон</p>
+            </div>
+            
+            <div class="mode-card" onclick="openGenerationPage()">
+                <div class="mode-icon">🎨</div>
+                <h3>Генерация изображений</h3>
+                <p>Создание изображений на основе текста и фото</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Функции навигации (fallback если main.js не загрузился)
+        if (typeof openLivePage === 'undefined') {
+            function openLivePage() {
+                console.log('Переход на страницу Live');
+                window.location.href = 'live.html';
+            }
+            window.openLivePage = openLivePage;
+        }
+        
+        if (typeof openGenerationPage === 'undefined') {
+            function openGenerationPage() {
+                console.log('Переход на страницу генерации');
+                window.location.href = 'generation.html';
+            }
+            window.openGenerationPage = openGenerationPage;
+        }
+        
+        if (typeof showAboutPage === 'undefined') {
+            function showAboutPage() {
+                console.log('Переход на страницу "О проекте"');
+                window.location.href = 'about.html';
+            }
+            window.showAboutPage = showAboutPage;
+        }
+    </script>
+    <script src="main.js"></script>
+</body>
+</html>
