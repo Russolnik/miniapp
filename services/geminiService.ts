@@ -3,6 +3,9 @@ import { AspectRatio } from "../types";
 
 export type ModelType = 'imagen-4.0-generate-001' | 'gemini-2.5-flash-image';
 
+// Экспортируем AspectRatio для компонентов
+export type { AspectRatio };
+
 const dataUrlToInlineData = (dataUrl: string) => {
     const [header, base64Data] = dataUrl.split(',');
     if (!header || !base64Data) {
@@ -29,6 +32,9 @@ export const generateImage = async (
     referenceImages: string[] // base64 data URLs
 ): Promise<string[]> => {
   try {
+    if (!apiKey) {
+      throw new Error("API ключ не предоставлен");
+    }
     const ai = new GoogleGenAI({ apiKey });
     
     if (model === 'imagen-4.0-generate-001') {
