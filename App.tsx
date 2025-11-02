@@ -87,45 +87,35 @@ async function getApiUrl(): Promise<string> {
     return await apiUrlCheckPromise;
   }
   
-  // Начинаем проверку
+  // Начинаем проверку - ВСЕГДА сначала пробуем localhost, потом production
   apiUrlCheckPromise = (async () => {
     const productionUrl = (window as any).API_URL || 'https://tg-ai-f9rj.onrender.com';
     const localUrl = 'http://localhost:5000';
     
-    // Проверяем, находимся ли мы на localhost
-    const isDevelopment = window.location.hostname === 'localhost' || 
-                          window.location.hostname === '127.0.0.1';
-    
     // Маскируем URL в логах
     const maskUrl = (url: string) => url ? `***${url.slice(-15)}` : 'не установлен';
-    console.log('🌐 Определение окружения:', {
-      hostname: window.location.hostname,
-      isDevelopment,
-      apiUrlFromWindow: maskUrl((window as any).API_URL || ''),
-      productionUrl: maskUrl(productionUrl)
-    });
+    console.log('🌐 Определение API сервера (сначала проверяем localhost)...');
     
-    if (isDevelopment) {
-      // Пробуем сначала локальный сервер
-      console.log('🔍 Проверка доступности локального сервера...');
+    // ВСЕГДА сначала проверяем локальный сервер (для удобства разработки)
+    console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
+    try {
       const localAvailable = await checkServerAvailable(localUrl);
-      
       if (localAvailable) {
-        console.log('✅ Локальный сервер доступен, используем его');
+        console.log('✅ Локальный сервер доступен, используем его для разработки');
         cachedApiUrl = localUrl;
         return localUrl;
       } else {
-        console.log('⚠️ Локальный сервер недоступен, переключаемся на продакшн');
-        cachedApiUrl = productionUrl;
-        return productionUrl;
+        console.log('⚠️ Локальный сервер недоступен');
       }
-    } else {
-      // В продакшне сразу используем production URL (без проверки localhost, т.к. CSP блокирует)
-      const maskedProdUrl = `***${productionUrl.slice(-15)}`;
-      console.log('🚀 Продакшен окружение, используем API URL:', maskedProdUrl);
-      cachedApiUrl = productionUrl;
-      return productionUrl;
+    } catch (e: any) {
+      console.log('⚠️ Ошибка проверки локального сервера:', e?.message || e);
     }
+    
+    // Если локальный сервер недоступен, используем production
+    const maskedProdUrl = maskUrl(productionUrl);
+    console.log('🚀 Используем продакшн API URL:', maskedProdUrl);
+    cachedApiUrl = productionUrl;
+    return productionUrl;
   })();
   
   return await apiUrlCheckPromise;
@@ -449,8 +439,48 @@ async function getUserApiKey(): Promise<string | null> {
   }
 }
 
+// Проверка статуса подписки перед использованием Live
+async function checkSubscriptionStatus(): Promise<{is_active: boolean} | null> {
+  try {
+    const apiUrl = await getApiUrl();
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData || '';
+    
+    if (!tg?.initDataUnsafe?.user?.id) {
+      console.warn('⚠️ Не удалось получить ID пользователя для проверки подписки');
+      return null;
+    }
+    
+    const telegramId = tg.initDataUnsafe.user.id;
+    
+    const response = await fetch(`${apiUrl}/api/user/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        telegram_id: telegramId,
+        initData: initData
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.subscription || null;
+    } else {
+      console.warn('⚠️ Ошибка проверки подписки:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при проверке подписки:', error);
+    return null;
+  }
+}
+
 const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{is_active: boolean} | null>(null);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isModelSpeaking, setIsModelSpeaking] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -547,6 +577,37 @@ const App: React.FC = () => {
   }, [cleanup]);
 
   const handleStartConversation = useCallback(async () => {
+    // Проверяем подписку перед началом разговора
+    if (!subscriptionChecked) {
+      const status = await checkSubscriptionStatus();
+      setSubscriptionStatus(status);
+      setSubscriptionChecked(true);
+      
+      if (!status || !status.is_active) {
+        const message = '🚫 **Доступ ограничен**\n\n' +
+          'Для использования Live общения требуется активная подписка.\n\n' +
+          'Используйте команду /subscription в боте для оформления подписки.';
+        
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert(message);
+        } else {
+          alert(message);
+        }
+        return;
+      }
+    } else if (!subscriptionStatus || !subscriptionStatus.is_active) {
+      const message = '🚫 **Доступ ограничен**\n\n' +
+        'Для использования Live общения требуется активная подписка.\n\n' +
+        'Используйте команду /subscription в боте для оформления подписки.';
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(message);
+      } else {
+        alert(message);
+      }
+      return;
+    }
+    
     setIsConnecting(true);
     setTranscript([]);
 

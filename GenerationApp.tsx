@@ -48,6 +48,8 @@ const GenerationApp: React.FC = () => {
   const [model, setModel] = useState<ModelType>('imagen-4.0-generate-001');
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [apiKeyLoading, setApiKeyLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{is_active: boolean} | null>(null);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Инициализация Telegram WebApp и получение API ключа

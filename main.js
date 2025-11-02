@@ -37,58 +37,35 @@ async function getApiUrl() {
         return await apiUrlCheckPromise;
     }
     
-    // Начинаем проверку
+    // Начинаем проверку - ВСЕГДА сначала пробуем localhost, потом production
     apiUrlCheckPromise = (async () => {
         const productionUrl = window.API_URL || 'https://tg-ai-f9rj.onrender.com';
         const localUrl = 'http://localhost:5000';
         
-        // Проверяем, находимся ли мы на localhost
-        const isDevelopment = window.location.hostname === 'localhost' || 
-                              window.location.hostname === '127.0.0.1';
-        
         // Маскируем URL в логах
         const maskUrl = (url) => url ? `***${url.slice(-15)}` : 'не установлен';
-        console.log('🌐 Определение окружения:', {
-            hostname: window.location.hostname,
-            isDevelopment,
-            apiUrlFromWindow: maskUrl(window.API_URL || ''),
-            productionUrl: maskUrl(productionUrl)
-        });
+        console.log('🌐 Определение API сервера (сначала проверяем localhost)...');
         
-        if (isDevelopment) {
-            // Пробуем сначала локальный сервер
-            console.log('🔍 Проверка доступности локального сервера...');
+        // ВСЕГДА сначала проверяем локальный сервер (для удобства разработки)
+        console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
+        try {
             const localAvailable = await checkServerAvailable(localUrl);
-            
             if (localAvailable) {
-                console.log('✅ Локальный сервер доступен, используем его');
+                console.log('✅ Локальный сервер доступен, используем его для разработки');
                 cachedApiUrl = localUrl;
                 return localUrl;
             } else {
-                console.log('⚠️ Локальный сервер недоступен, переключаемся на продакшн');
-                cachedApiUrl = productionUrl;
-                return productionUrl;
+                console.log('⚠️ Локальный сервер недоступен');
             }
-        } else {
-            // В продакшне сначала проверяем локальный сервер (может быть доступен через туннель)
-            console.log('🔍 Проверка доступности локального сервера (продакшен)...');
-            try {
-                const localAvailable = await checkServerAvailable(localUrl);
-                if (localAvailable) {
-                    console.log('✅ Локальный сервер доступен, используем его');
-                    cachedApiUrl = localUrl;
-                    return localUrl;
-                }
-            } catch (e) {
-                // Игнорируем ошибки проверки локального сервера
-            }
-            
-            // В продакшне используем production URL
-            const maskedProdUrl = `***${productionUrl.slice(-15)}`;
-            console.log('🚀 Продакшен окружение, используем API URL:', maskedProdUrl);
-            cachedApiUrl = productionUrl;
-            return productionUrl;
+        } catch (e) {
+            console.log('⚠️ Ошибка проверки локального сервера:', e.message);
         }
+        
+        // Если локальный сервер недоступен, используем production
+        const maskedProdUrl = maskUrl(productionUrl);
+        console.log('🚀 Используем продакшн API URL:', maskedProdUrl);
+        cachedApiUrl = productionUrl;
+        return productionUrl;
     })();
     
     return await apiUrlCheckPromise;
@@ -199,7 +176,108 @@ async function loadUserDataFromServer() {
     }
 
     updateUserUI(currentUser, userSubscription);
+    updateModeCardsAccess(userSubscription);
 }
+
+// Обновление доступности карточек режимов в зависимости от подписки
+function updateModeCardsAccess(subscription) {
+    const hasActiveSubscription = subscription && subscription.is_active;
+    
+    // Карточка Live
+    const liveCard = document.querySelector('.mode-card[onclick*="openLivePage"], .mode-card:has(.mode-icon:contains("🗣️"))');
+    if (!liveCard) {
+        // Альтернативный поиск по тексту
+        const cards = document.querySelectorAll('.mode-card');
+        cards.forEach(card => {
+            if (card.textContent.includes('Live общение')) {
+                const tempCard = card;
+                if (!hasActiveSubscription) {
+                    tempCard.classList.add('disabled');
+                    tempCard.style.opacity = '0.6';
+                    tempCard.style.cursor = 'not-allowed';
+                    tempCard.setAttribute('onclick', 'checkSubscriptionAndOpen("live")');
+                } else {
+                    tempCard.classList.remove('disabled');
+                    tempCard.style.opacity = '1';
+                    tempCard.style.cursor = 'pointer';
+                    tempCard.setAttribute('onclick', 'openLivePage()');
+                }
+            }
+        });
+    } else {
+        if (!hasActiveSubscription) {
+            liveCard.classList.add('disabled');
+            liveCard.style.opacity = '0.6';
+            liveCard.style.cursor = 'not-allowed';
+            liveCard.setAttribute('onclick', 'checkSubscriptionAndOpen("live")');
+        } else {
+            liveCard.classList.remove('disabled');
+            liveCard.style.opacity = '1';
+            liveCard.style.cursor = 'pointer';
+            liveCard.setAttribute('onclick', 'openLivePage()');
+        }
+    }
+    
+    // Карточка Generation
+    const generationCard = document.getElementById('generation-card') || 
+                           document.querySelector('.mode-card[onclick*="openGenerationPage"]');
+    
+    if (generationCard) {
+        if (!hasActiveSubscription) {
+            generationCard.classList.add('disabled');
+            generationCard.style.opacity = '0.6';
+            generationCard.style.cursor = 'not-allowed';
+            generationCard.setAttribute('onclick', 'checkSubscriptionAndOpen("generation")');
+            
+            // Добавляем бейдж "Требуется подписка"
+            if (!generationCard.querySelector('.subscription-badge')) {
+                const badge = document.createElement('div');
+                badge.className = 'subscription-badge';
+                badge.style.cssText = 'position: absolute; top: 8px; right: 8px; background: #f44336; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;';
+                badge.textContent = 'Требуется подписка';
+                generationCard.style.position = 'relative';
+                generationCard.appendChild(badge);
+            }
+        } else {
+            generationCard.classList.remove('disabled');
+            generationCard.style.opacity = '1';
+            generationCard.style.cursor = 'pointer';
+            generationCard.setAttribute('onclick', 'openGenerationPage()');
+            
+            // Удаляем бейдж если есть
+            const badge = generationCard.querySelector('.subscription-badge');
+            if (badge) {
+                badge.remove();
+            }
+        }
+    }
+}
+
+// Функция проверки подписки перед открытием страницы
+function checkSubscriptionAndOpen(page) {
+    if (!userSubscription || !userSubscription.is_active) {
+        const message = '🚫 **Доступ ограничен**\n\n' +
+            'Для использования этого раздела требуется активная подписка.\n\n' +
+            'Используйте команду /subscription в боте для оформления подписки.';
+        
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.showAlert(message);
+        } else {
+            alert(message);
+        }
+        return;
+    }
+    
+    // Если подписка активна, открываем страницу
+    if (page === 'live') {
+        openLivePage();
+    } else if (page === 'generation') {
+        openGenerationPage();
+    }
+}
+
+// Делаем функцию глобальной
+window.checkSubscriptionAndOpen = checkSubscriptionAndOpen;
 
 // Обновление UI пользователя
 function updateUserUI(user, subscription) {
@@ -261,8 +339,22 @@ function updateUserUI(user, subscription) {
     }
 }
 
-// Переход на страницу Live - с плавной анимацией
+// Переход на страницу Live - с проверкой подписки
 function openLivePage() {
+    // Проверяем подписку перед доступом
+    if (!userSubscription || !userSubscription.is_active) {
+        const message = '🚫 **Доступ ограничен**\n\n' +
+            'Для использования Live общения требуется активная подписка.\n\n' +
+            'Используйте команду /subscription в боте для оформления подписки.';
+        
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.showAlert(message);
+        } else {
+            alert(message);
+        }
+        return;
+    }
+    
     // Добавляем класс для плавного перехода
     document.body.style.transition = 'opacity 0.2s ease-out';
     document.body.style.opacity = '0.95';
@@ -273,16 +365,30 @@ function openLivePage() {
     }, 50);
 }
 
-// Переход на страницу генерации (временно отключено)
+// Переход на страницу генерации - с проверкой подписки
 function openGenerationPage() {
-    console.log('Режим генерации изображений временно недоступен - в разработке');
-    // Показываем уведомление пользователю
-    if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Режим генерации изображений временно недоступен. Мы работаем над этим функционалом.');
-    } else {
-        alert('Режим генерации изображений временно недоступен. Мы работаем над этим функционалом.');
+    // Проверяем подписку перед доступом
+    if (!userSubscription || !userSubscription.is_active) {
+        const message = '🚫 **Доступ ограничен**\n\n' +
+            'Для использования генерации изображений требуется активная подписка.\n\n' +
+            'Используйте команду /subscription в боте для оформления подписки.';
+        
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.showAlert(message);
+        } else {
+            alert(message);
+        }
+        return false;
     }
-    return false;
+    
+    // Добавляем класс для плавного перехода
+    document.body.style.transition = 'opacity 0.2s ease-out';
+    document.body.style.opacity = '0.95';
+    
+    // Переход на страницу генерации
+    setTimeout(() => {
+        window.location.href = 'generation.html';
+    }, 50);
 }
 
 // Показать страницу "О проекте"
