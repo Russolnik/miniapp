@@ -16,16 +16,12 @@
   functions = "netlify/functions"
 
 # Настройки функций Netlify
-[functions]
-  # Регион для выполнения функций (US East - работает для обхода блокировок)
-  # Важно: Функции будут выполняться в US, поэтому запросы к Google API пойдут не из РФ/Беларуси
-  region = "us-east-2"
-  
-  # Таймаут для функций (в секундах)
-  timeout = 60
-  
-  # Память для функций (в MB)
-  memory = 1024
+# Примечание: Регион функций настраивается в Netlify Dashboard:
+# Site settings → Functions → Configure how functions are deployed
+# Выберите Region: US East (Ohio) - us-east-2
+# 
+# Это важно для обхода блокировок в РФ/Беларуси, т.к. функции будут
+# выполняться на серверах в США, а не из заблокированных регионов.
 
 [[headers]]
   for = "/*"
