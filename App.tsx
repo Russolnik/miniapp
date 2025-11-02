@@ -567,7 +567,7 @@ const App: React.FC = () => {
       outputGainNodeRef.current.connect(outputAudioContextRef.current.destination);
 
       sessionPromiseRef.current = ai.live.connect({
-        model: 'gemini-2.5-flash-live',
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           inputAudioTranscription: {},
