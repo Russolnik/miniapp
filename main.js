@@ -1,7 +1,7 @@
 // Импорты утилит
 import { initTelegramWebApp, getTelegramIdFromWebApp, getTelegramIdFromUrl } from './utils/telegramUtils.js';
 import { getApiUrl } from './utils/apiUtils.js';
-import { fetchUserDataByTelegramId, fetchFullUserData, getTelegramIdFromServer } from './utils/userDataUtils.js';
+import { fetchUserDataByTelegramId, fetchFullUserData, getTelegramIdFromServer, getAvatarUrl } from './utils/userDataUtils.js';
 
 // Инициализация Telegram WebApp
 let tg = null;
@@ -41,11 +41,17 @@ async function loadFullUserDataFromServer(telegramId, initData = null) {
         
         // Обновляем данные пользователя
         if (statusData.user) {
+            // Преобразуем photo_url в полный URL сервера
+            const serverPhotoUrl = await getAvatarUrl(
+                statusData.user.photo_url, 
+                statusData.user.telegram_id || telegramId
+            );
+            
             currentUser = {
                 telegramId: statusData.user.telegram_id || telegramId,
                 firstName: statusData.user.first_name || currentUser?.firstName || 'Пользователь',
                 username: statusData.user.username || currentUser?.username || null,
-                photoUrl: statusData.user.photo_url || currentUser?.photoUrl || null
+                photoUrl: serverPhotoUrl
             };
             
             console.log('✅ Данные пользователя получены с сервера (из БД):', {
@@ -152,12 +158,15 @@ async function loadUserDataFromServer() {
                 photo_url: statusData.user.photo_url || null
             };
             
+            // Преобразуем photo_url в полный URL сервера
+            const serverPhotoUrl = await getAvatarUrl(telegramUser.photo_url, telegramId);
+            
             // Обновляем UI сразу
             currentUser = {
                 telegramId: telegramId,
                 firstName: telegramUser.first_name || 'Пользователь',
                 username: telegramUser.username || null,
-                photoUrl: telegramUser.photo_url || null
+                photoUrl: serverPhotoUrl
             };
             updateUserUI(currentUser, null);
             
@@ -233,12 +242,15 @@ async function loadUserDataFromServer() {
         return;
     }
     
+    // Преобразуем photo_url в полный URL сервера
+    const serverPhotoUrl = await getAvatarUrl(telegramUser.photo_url, telegramId);
+    
     // Сразу показываем данные из Telegram для быстрого отображения
     currentUser = {
         telegramId: telegramId,
         firstName: telegramUser.first_name || 'Пользователь',
         username: telegramUser.username || null,
-        photoUrl: telegramUser.photo_url || null
+        photoUrl: serverPhotoUrl
     };
     updateUserUI(currentUser, null);
     console.log('✅ Данные пользователя из Telegram:', {
