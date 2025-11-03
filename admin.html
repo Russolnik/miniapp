@@ -4,808 +4,242 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Админ-панель</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="theme.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Comfortaa', 'Rubik', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+        /* Дополнительные стили для админки */
+        .admin-password-container {
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 100vh;
             padding: 20px;
         }
         
-        .admin-container {
-            background: white;
-            border-radius: 20px;
+        .admin-password-card {
+            background: var(--cloud-white);
+            border-radius: 24px;
             padding: 40px;
-            max-width: 500px;
+            max-width: 400px;
             width: 100%;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px var(--shadow-soft);
         }
         
-        .admin-header {
-            text-align: center;
-            margin-bottom: 30px;
+        .admin-main {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
         
-        .admin-header h1 {
-            color: #667eea;
-            font-size: 28px;
-            margin-bottom: 10px;
+        .admin-section {
+            background: var(--cloud-white);
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px var(--shadow-soft);
         }
         
-        .admin-header p {
-            color: #666;
-            font-size: 14px;
+        .theme-night .admin-password-card,
+        .theme-night .admin-section,
+        [data-theme="night"] .admin-password-card,
+        [data-theme="night"] .admin-section {
+            background: var(--night-card-bg);
+            border: 1px solid var(--night-border);
         }
         
-        .password-form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        .password-input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        label {
-            color: #333;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        input[type="password"] {
-            padding: 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            font-family: 'Rubik', sans-serif;
-            transition: all 0.3s;
-        }
-        
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            display: none;
-        }
-        
-        .error-message.show {
-            display: block;
-        }
-        
-        .btn {
-            padding: 14px 24px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: 'Comfortaa', sans-serif;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-        
-        .admin-panel {
-            display: none;
-        }
-        
-        .admin-panel.show {
-            display: block;
-        }
-        
-        .stats-grid {
+        .admin-stats-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .admin-stat-card {
+            background: rgba(79, 195, 247, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .theme-night .admin-stat-card,
+        [data-theme="night"] .admin-stat-card {
+            background: rgba(63, 81, 181, 0.2);
+        }
+        
+        .admin-search-container {
+            position: relative;
             margin-bottom: 20px;
         }
         
-        .stat-card {
-            background: #f8f9fa;
-            padding: 20px;
+        .admin-search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--sky-blue-light);
             border-radius: 12px;
-            text-align: center;
+            font-size: 16px;
+            font-family: 'Rubik', sans-serif;
+            background: var(--cloud-white);
+            color: var(--text-primary);
         }
         
-        .stat-card h3 {
-            color: #667eea;
-            font-size: 24px;
-            margin-bottom: 5px;
+        .theme-night .admin-search-input,
+        [data-theme="night"] .admin-search-input {
+            background: var(--night-card-bg);
+            border-color: var(--night-border);
+            color: var(--night-text-primary);
         }
         
-        .stat-card p {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .section {
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 2px solid #e0e0e0;
-        }
-        
-        .section h2 {
-            color: #333;
-            font-size: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .btn-back {
+        .admin-user-details {
+            background: rgba(79, 195, 247, 0.05);
+            border-radius: 16px;
+            padding: 20px;
             margin-top: 20px;
-            background: #e0e0e0;
-            color: #333;
         }
         
-        .btn-back:hover {
-            background: #d0d0d0;
+        .theme-night .admin-user-details,
+        [data-theme="night"] .admin-user-details {
+            background: rgba(63, 81, 181, 0.1);
+        }
+        
+        .admin-field-group {
+            margin-bottom: 16px;
+        }
+        
+        .admin-field-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .theme-night .admin-field-label,
+        [data-theme="night"] .admin-field-label {
+            color: var(--night-text-primary);
+        }
+        
+        .admin-field-value {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            border: 1px solid var(--sky-blue-light);
+        }
+        
+        .theme-night .admin-field-value,
+        [data-theme="night"] .admin-field-value {
+            background: rgba(33, 33, 33, 0.5);
+            border-color: var(--night-border);
+            color: var(--night-text-primary);
+        }
+        
+        .admin-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .admin-btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .admin-edit-mode {
+            display: none;
+        }
+        
+        .admin-edit-mode.active {
+            display: block;
+        }
+        
+        .admin-view-mode {
+            display: block;
+        }
+        
+        .admin-view-mode.hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="admin-container">
-        <!-- Форма ввода пароля -->
-        <div id="password-form" class="password-form">
+    <!-- Форма ввода пароля -->
+    <div id="password-form" class="admin-password-container">
+        <div class="admin-password-card">
             <div class="admin-header">
                 <h1>🔒 Админ-панель</h1>
                 <p>Введите пароль для доступа</p>
             </div>
             
-            <div class="password-input-group">
-                <label for="password">Пароль</label>
-                <input type="password" id="password" placeholder="Введите пароль" autocomplete="off">
+            <div style="margin-top: 30px;">
+                <input type="password" id="password" class="admin-search-input" placeholder="Введите пароль" autocomplete="off" style="margin-bottom: 15px;">
+                <div id="error-message" style="display: none; background: #fee; color: #c33; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                    Неверный пароль. Попробуйте снова.
+                </div>
+                <button class="btn btn-primary" onclick="checkPassword()" style="width: 100%;">Войти</button>
             </div>
-            
-            <div id="error-message" class="error-message">
-                Неверный пароль. Попробуйте снова.
-            </div>
-            
-            <button class="btn btn-primary" onclick="checkPassword()">Войти</button>
         </div>
-        
-        <!-- Админ-панель (скрыта до ввода пароля) -->
-        <div id="admin-panel" class="admin-panel">
+    </div>
+    
+    <!-- Основная админ-панель (скрыта до ввода пароля) -->
+    <div id="admin-panel" style="display: none;">
+        <div class="admin-main">
+            <!-- Кнопка переключения темы -->
+            <button class="theme-toggle-btn" onclick="window.themeManager.toggleTheme()" title="Переключить тему">
+                <span id="theme-icon">🌓</span>
+            </button>
+            
             <div class="admin-header">
                 <h1>👨‍💼 Админ-панель</h1>
                 <p>Управление системой</p>
             </div>
             
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3 id="total-users">-</h3>
-                    <p>Всего пользователей</p>
-                </div>
-                <div class="stat-card">
-                    <h3 id="active-keys">-</h3>
-                    <p>Активных ключей</p>
-                </div>
-                <div class="stat-card">
-                    <h3 id="trial-active">-</h3>
-                    <p>Активных пробных</p>
-                </div>
-                <div class="stat-card">
-                    <h3 id="subscribed">-</h3>
-                    <p>С подпиской</p>
-                </div>
-            </div>
-            
-            <div class="section">
-                <h2>👥 Пользователи</h2>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="text" id="admin-search-user" placeholder="Поиск по ID или username" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                        <button class="btn btn-primary" onclick="adminSearchUser()">Найти</button>
+            <!-- Статистика -->
+            <div class="admin-section">
+                <h2 style="margin-bottom: 16px;">📊 Статистика</h2>
+                <div class="admin-stats-grid">
+                    <div class="admin-stat-card">
+                        <h3 id="total-users" style="font-size: 28px; margin-bottom: 8px;">-</h3>
+                        <p>Всего пользователей</p>
                     </div>
-                    <button class="btn" onclick="adminLoadUsersList()" style="background: #42a5f5;">Загрузить всех пользователей</button>
-                    <div id="admin-users-list" style="display: none; margin-top: 15px; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
-                        <div id="admin-users-list-content"></div>
+                    <div class="admin-stat-card">
+                        <h3 id="active-keys" style="font-size: 28px; margin-bottom: 8px;">-</h3>
+                        <p>Активных ключей</p>
                     </div>
-                    <div id="admin-user-info" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f5f5f5;">
-                        <h3 id="admin-user-info-title">Информация о пользователе</h3>
-                        <div id="admin-user-info-content"></div>
+                    <div class="admin-stat-card">
+                        <h3 id="trial-active" style="font-size: 28px; margin-bottom: 8px;">-</h3>
+                        <p>Активных пробных</p>
+                    </div>
+                    <div class="admin-stat-card">
+                        <h3 id="subscribed" style="font-size: 28px; margin-bottom: 8px;">-</h3>
+                        <p>С подпиской</p>
                     </div>
                 </div>
             </div>
             
-            <div class="section">
-                <h2>💎 Управление подписками</h2>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="number" id="admin-user-id" placeholder="Telegram ID пользователя" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn btn-primary" onclick="adminCreateSubscription('1_month')" style="flex: 1; min-width: 120px;">
-                            Добавить 1 мес
-                        </button>
-                        <button class="btn btn-primary" onclick="adminCreateSubscription('3_months')" style="flex: 1; min-width: 120px;">
-                            Добавить 3 мес
-                        </button>
-                        <button class="btn btn-primary" onclick="adminCreateSubscription('6_months')" style="flex: 1; min-width: 120px;">
-                            Добавить 6 мес
-                        </button>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn" onclick="adminPauseSubscription()" style="flex: 1; background: #ffa726;">
-                            Пауза
-                        </button>
-                        <button class="btn" onclick="adminResumeSubscription()" style="flex: 1; background: #66bb6a;">
-                            Возобновить
-                        </button>
-                        <button class="btn" onclick="adminStopSubscription()" style="flex: 1; background: #ef5350;">
-                            Остановить
-                        </button>
-                    </div>
-                    <div id="admin-subscription-result" style="margin-top: 10px; padding: 10px; border-radius: 8px; display: none;"></div>
+            <!-- Поиск пользователя -->
+            <div class="admin-section">
+                <h2 style="margin-bottom: 16px;">🔍 Поиск пользователя</h2>
+                <div class="admin-search-container">
+                    <input type="text" id="admin-search-user" class="admin-search-input" placeholder="Поиск по ID, username или имени..." autocomplete="off">
+                </div>
+                <button class="btn btn-primary" onclick="adminSearchUser()" style="width: 100%; margin-bottom: 10px;">Найти</button>
+                <button class="btn" onclick="adminLoadUsersList()" style="width: 100%; background: #42a5f5; color: white;">📋 Загрузить всех пользователей</button>
+                
+                <!-- Результаты поиска -->
+                <div id="admin-users-list" style="display: none; margin-top: 20px; max-height: 400px; overflow-y: auto;"></div>
+                
+                <!-- Информация о пользователе -->
+                <div id="admin-user-info" class="admin-user-details" style="display: none; margin-top: 20px;">
+                    <h3 id="admin-user-info-title" style="margin-bottom: 20px;">Информация о пользователе</h3>
+                    <div id="admin-user-info-content"></div>
                 </div>
             </div>
-            
-            <button class="btn btn-back" onclick="logout()">Выйти</button>
         </div>
     </div>
     
-    <script>
-        // Зашифрованный пароль (простое шифрование для примера)
-        // В реальном проекте используйте bcrypt на сервере
-        const ADMIN_PASSWORD_HASH = 'a8f5f167f44f4964e6c998dee827110c'; // MD5 hash для "240123"
-        
-        // Проверка пароля (MD5 для простоты, в продакшене использовать bcrypt на сервере)
-        async function checkPassword() {
-            const passwordInput = document.getElementById('password');
-            const password = passwordInput.value;
-            const errorMessage = document.getElementById('error-message');
-            
-            if (!password) {
-                errorMessage.textContent = 'Пожалуйста, введите пароль';
-                errorMessage.classList.add('show');
-                return;
-            }
-            
-            // Простая проверка (в продакшене делать на сервере)
-            // Используем MD5 для простоты, но лучше bcrypt на сервере
-            const crypto = window.crypto || window.msCrypto;
-            if (crypto && crypto.subtle) {
-                // Проверяем пароль напрямую (простая проверка)
-                if (password === '240123') {
-                    // Пароль верный
-                    showAdminPanel();
-                } else {
-                    // Пароль неверный
-                    errorMessage.textContent = 'Неверный пароль. Попробуйте снова.';
-                    errorMessage.classList.add('show');
-                    passwordInput.value = '';
-                    passwordInput.focus();
-                }
-            } else {
-                // Fallback для старых браузеров
-                if (password === '240123') {
-                    showAdminPanel();
-                } else {
-                    errorMessage.textContent = 'Неверный пароль. Попробуйте снова.';
-                    errorMessage.classList.add('show');
-                    passwordInput.value = '';
-                    passwordInput.focus();
-                }
-            }
-        }
-        
-        // Проверка пароля при нажатии Enter
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                checkPassword();
-            }
-        });
-        
-        function showAdminPanel() {
-            document.getElementById('password-form').style.display = 'none';
-            document.getElementById('admin-panel').classList.add('show');
-            
-            // Загружаем статистику (пока заглушка)
-            loadStats();
-        }
-        
-        function logout() {
-            document.getElementById('password-form').style.display = 'flex';
-            document.getElementById('admin-panel').classList.remove('show');
-            document.getElementById('password').value = '';
-            document.getElementById('error-message').classList.remove('show');
-        }
-        
-        // Получение API URL (сначала localhost, потом production)
-        async function getApiUrl() {
-            const productionUrl = window.API_URL || 'https://tg-ai-f9rj.onrender.com';
-            const localUrl = 'http://localhost:5000';
-            
-            try {
-                const response = await fetch(`${localUrl}/health`, { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(3000)
-                });
-                if (response.ok) {
-                    return localUrl;
-                }
-            } catch (e) {
-                // localhost недоступен
-            }
-            
-            return productionUrl;
-        }
-        
-        async function loadStats() {
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            document.getElementById('total-users').textContent = '...';
-            document.getElementById('active-keys').textContent = '...';
-            document.getElementById('trial-active').textContent = '...';
-            document.getElementById('subscribed').textContent = '...';
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/stats`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ password: password })
-                });
-                
-                if (response.ok) {
-                    const stats = await response.json();
-                    document.getElementById('total-users').textContent = stats.total_users || 0;
-                    document.getElementById('active-keys').textContent = stats.active_keys || 0;
-                    document.getElementById('trial-active').textContent = stats.trial_active || 0;
-                    document.getElementById('subscribed').textContent = stats.subscribed || 0;
-                } else {
-                    console.error('Ошибка загрузки статистики:', response.status);
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки статистики:', error);
-            }
-        }
-        
-        function showResult(message, type) {
-            const resultDiv = document.getElementById('admin-subscription-result');
-            if (!resultDiv) return;
-            resultDiv.textContent = message;
-            resultDiv.style.display = 'block';
-            resultDiv.style.background = type === 'success' ? '#e8f5e9' : '#ffebee';
-            resultDiv.style.color = type === 'success' ? '#2e7d32' : '#c62828';
-            
-            setTimeout(() => {
-                resultDiv.style.display = 'none';
-            }, 5000);
-        }
-        
-        async function adminLoadUsersList() {
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            const listDiv = document.getElementById('admin-users-list');
-            const contentDiv = document.getElementById('admin-users-list-content');
-            listDiv.style.display = 'block';
-            contentDiv.innerHTML = '<p>Загрузка...</p>';
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/users/list`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ password: password, limit: 1000, offset: 0 })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const users = data.users || [];
-                    
-                    if (users.length === 0) {
-                        contentDiv.innerHTML = '<p>Пользователи не найдены</p>';
-                        return;
-                    }
-                    
-                    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
-                    html += '<thead><tr style="background: #f0f0f0;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Username</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Имя</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Действие</th></tr></thead><tbody>';
-                    
-                    users.forEach(user => {
-                        html += `<tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${user.telegram_id}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${user.username || '—'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${user.first_name || '—'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">
-                                <button class="btn btn-primary" onclick="adminShowUserInfo('${user.telegram_id}')" style="padding: 5px 10px; font-size: 12px;">Подробнее</button>
-                            </td>
-                        </tr>`;
-                    });
-                    
-                    html += '</tbody></table>';
-                    contentDiv.innerHTML = html;
-                } else {
-                    contentDiv.innerHTML = '<p style="color: red;">Ошибка загрузки списка пользователей</p>';
-                }
-            } catch (error) {
-                contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
-            }
-        }
-        
-        async function adminSearchUser() {
-            const searchTerm = document.getElementById('admin-search-user').value.trim();
-            if (!searchTerm) {
-                showResult('Введите ID или username для поиска', 'error');
-                return;
-            }
-            
-            await adminShowUserInfo(searchTerm);
-        }
-        
-        async function adminShowUserInfo(searchTerm) {
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            const infoDiv = document.getElementById('admin-user-info');
-            const titleDiv = document.getElementById('admin-user-info-title');
-            const contentDiv = document.getElementById('admin-user-info-content');
-            
-            infoDiv.style.display = 'block';
-            contentDiv.innerHTML = '<p>Загрузка...</p>';
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/users/search`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        search_term: searchTerm.toString()
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    if (!data.found || !data.user) {
-                        contentDiv.innerHTML = '<p style="color: red;">Пользователь не найден</p>';
-                        return;
-                    }
-                    
-                    const user = data.user;
-                    
-                    // Обновляем поле ID для управления подпиской
-                    document.getElementById('admin-user-id').value = user.telegram_id;
-                    
-                    let html = `<div style="display: flex; flex-direction: column; gap: 10px;">`;
-                    html += `<div><strong>ID:</strong> ${user.telegram_id}</div>`;
-                    html += `<div><strong>Username:</strong> ${user.username || '—'}</div>`;
-                    html += `<div><strong>Имя:</strong> ${user.first_name || '—'}</div>`;
-                    
-                    // Информация о пробном периоде
-                    const trial = user.trial_status || {};
-                    html += `<div style="margin-top: 10px;"><strong>Пробный период:</strong> `;
-                    if (trial.is_active) {
-                        html += `✅ Активен (осталось: ${trial.hours_remaining ? trial.hours_remaining.toFixed(1) : 0} ч.)`;
-                    } else if (trial.trial_used) {
-                        html += `❌ Использован`;
-                    } else {
-                        html += `🆕 Доступен`;
-                    }
-                    html += `</div>`;
-                    
-                    // Информация о подписке
-                    const subscription = user.active_subscription;
-                    if (subscription) {
-                        // Форматируем время детально (дни и часы)
-                        const totalHours = subscription.hours_left || 0;
-                        const days = Math.floor(totalHours / 24);
-                        const hours = Math.floor(totalHours % 24);
-                        
-                        let timeLeftText = '';
-                        if (days > 0 && hours > 0) {
-                            timeLeftText = `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} и ${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
-                        } else if (days > 0) {
-                            timeLeftText = `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}`;
-                        } else if (hours > 0) {
-                            timeLeftText = `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
-                        }
-                        
-                        const trialHoursAdded = subscription.trial_hours_added || 0;
-                        let trialInfo = '';
-                        if (trialHoursAdded > 0) {
-                            const trialDays = Math.floor(trialHoursAdded / 24);
-                            const trialHours = Math.floor(trialHoursAdded % 24);
-                            if (trialDays > 0 && trialHours > 0) {
-                                trialInfo = `<br>🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} ${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
-                            } else if (trialDays > 0) {
-                                trialInfo = `<br>🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} из пробного периода`;
-                            } else if (trialHours > 0) {
-                                trialInfo = `<br>🎁 +${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
-                            }
-                        }
-                        
-                        html += `<div style="margin-top: 10px; padding: 10px; background: white; border-radius: 8px;">`;
-                        html += `<strong>💎 Активная подписка:</strong><br>`;
-                        html += `Тип: ${subscription.type}<br>`;
-                        html += `Осталось: ${timeLeftText || '0'}<br>`;
-                        html += `Действует до: ${new Date(subscription.end_date).toLocaleString('ru-RU')}<br>`;
-                        html += `Оплата: ${subscription.is_stars_payment ? 'Stars ⭐' : 'Ручная'}<br>`;
-                        if (trialInfo) {
-                            html += trialInfo;
-                        }
-                        
-                        // Показываем % использования для подписок на 3-6 месяцев
-                        if (subscription.usage_percent !== undefined && subscription.usage_percent !== null) {
-                            const usagePercent = subscription.usage_percent;
-                            const refundPercent = subscription.refund_percent || 0;
-                            html += `<br><strong>Использование периода:</strong><br>`;
-                            html += `Использовано: ${usagePercent.toFixed(2)}%<br>`;
-                            html += `Возможный возврат: ${refundPercent.toFixed(2)}% от суммы`;
-                            
-                            // Визуальный индикатор
-                            const progressColor = usagePercent > 50 ? '#ef5350' : (usagePercent > 25 ? '#ffa726' : '#66bb6a');
-                            html += `<div style="margin-top: 5px; width: 100%; height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden;">`;
-                            html += `<div style="width: ${usagePercent}%; height: 100%; background: ${progressColor}; transition: width 0.3s;"></div>`;
-                            html += `</div>`;
-                        }
-                        
-                        html += `</div>`;
-                        
-                        // Кнопки управления подпиской
-                        html += `<div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">`;
-                        if (subscription.is_active) {
-                            html += `<button class="btn" onclick="adminPauseSubscription()" style="flex: 1; background: #ffa726; min-width: 120px;">Пауза</button>`;
-                            html += `<button class="btn" onclick="adminStopSubscription()" style="flex: 1; background: #ef5350; min-width: 120px;">Остановить</button>`;
-                        } else {
-                            html += `<button class="btn" onclick="adminResumeSubscription()" style="flex: 1; background: #66bb6a; min-width: 120px;">Возобновить</button>`;
-                        }
-                        html += `</div>`;
-                    } else {
-                        html += `<div style="margin-top: 10px;"><strong>Подписка:</strong> ❌ Не активна</div>`;
-                    }
-                    
-                    html += `</div>`;
-                    
-                    contentDiv.innerHTML = html;
-                    titleDiv.textContent = `Пользователь: ${user.first_name || user.telegram_id}`;
-                } else {
-                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
-                    contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.error || 'Неизвестная ошибка'}</p>`;
-                }
-            } catch (error) {
-                contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
-            }
-        }
-        
-        // Функции управления подписками
-        async function adminCreateSubscription(subscriptionType) {
-            const userIdInput = document.getElementById('admin-user-id');
-            const telegramId = userIdInput ? userIdInput.value.trim() : '';
-            
-            if (!telegramId) {
-                showResult('Введите Telegram ID пользователя', 'error');
-                return;
-            }
-            
-            const typeNames = {
-                '1_month': '1 месяц',
-                '3_months': '3 месяца',
-                '6_months': '6 месяцев'
-            };
-            
-            const confirmMessage = `Вы уверены, что хотите добавить подписку ${typeNames[subscriptionType]} пользователю ${telegramId}?`;
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-            
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/subscription/create`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        telegram_id: telegramId,
-                        subscription_type: subscriptionType
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    showResult(`✅ Подписка успешно добавлена пользователю ${telegramId}`, 'success');
-                    // Обновляем информацию о пользователе если она открыта
-                    if (telegramId) {
-                        setTimeout(() => adminShowUserInfo(telegramId), 1000);
-                    }
-                } else {
-                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
-                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
-                }
-            } catch (error) {
-                showResult(`❌ Ошибка: ${error.message}`, 'error');
-            }
-        }
-        
-        async function adminPauseSubscription() {
-            const userIdInput = document.getElementById('admin-user-id');
-            const telegramId = userIdInput ? userIdInput.value.trim() : '';
-            
-            if (!telegramId) {
-                showResult('Сначала найдите пользователя и выберите его', 'error');
-                return;
-            }
-            
-            if (!confirm(`Вы уверены, что хотите поставить подписку пользователя ${telegramId} на паузу?`)) {
-                return;
-            }
-            
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/subscription/pause`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        telegram_id: telegramId
-                    })
-                });
-                
-                if (response.ok) {
-                    showResult(`✅ Подписка пользователя ${telegramId} поставлена на паузу`, 'success');
-                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
-                } else {
-                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
-                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
-                }
-            } catch (error) {
-                showResult(`❌ Ошибка: ${error.message}`, 'error');
-            }
-        }
-        
-        async function adminResumeSubscription() {
-            const userIdInput = document.getElementById('admin-user-id');
-            const telegramId = userIdInput ? userIdInput.value.trim() : '';
-            
-            if (!telegramId) {
-                showResult('Сначала найдите пользователя и выберите его', 'error');
-                return;
-            }
-            
-            if (!confirm(`Вы уверены, что хотите возобновить подписку пользователя ${telegramId}?`)) {
-                return;
-            }
-            
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/subscription/resume`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        telegram_id: telegramId
-                    })
-                });
-                
-                if (response.ok) {
-                    showResult(`✅ Подписка пользователя ${telegramId} возобновлена`, 'success');
-                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
-                } else {
-                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
-                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
-                }
-            } catch (error) {
-                showResult(`❌ Ошибка: ${error.message}`, 'error');
-            }
-        }
-        
-        async function adminStopSubscription() {
-            const userIdInput = document.getElementById('admin-user-id');
-            const telegramId = userIdInput ? userIdInput.value.trim() : '';
-            
-            if (!telegramId) {
-                showResult('Сначала найдите пользователя и выберите его', 'error');
-                return;
-            }
-            
-            if (!confirm(`⚠️ ВНИМАНИЕ! Вы уверены, что хотите остановить подписку пользователя ${telegramId}?\n\nЭто действие нельзя отменить!`)) {
-                return;
-            }
-            
-            const password = localStorage.getItem('admin_password') || '240123';
-            const apiUrl = await getApiUrl();
-            
-            try {
-                const response = await fetch(`${apiUrl}/api/admin/subscription/stop`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        password: password,
-                        telegram_id: telegramId
-                    })
-                });
-                
-                if (response.ok) {
-                    showResult(`✅ Подписка пользователя ${telegramId} остановлена`, 'success');
-                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
-                } else {
-                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
-                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
-                }
-            } catch (error) {
-                showResult(`❌ Ошибка: ${error.message}`, 'error');
-            }
-        }
-        
-        // Делаем функции глобальными
-        window.adminCreateSubscription = adminCreateSubscription;
-        window.adminPauseSubscription = adminPauseSubscription;
-        window.adminResumeSubscription = adminResumeSubscription;
-        window.adminStopSubscription = adminStopSubscription;
-        
-        // Поддержка Enter для поиска
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.getElementById('admin-search-user');
-            if (searchInput) {
-                searchInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        adminSearchUser();
-                    }
-                });
-            }
-        });
-        
-        // Инициализация Telegram WebApp
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-        }
-    </script>
+    <script src="admin.js"></script>
 </body>
 </html>
-
