@@ -1,257 +1,128 @@
+// Импорты утилит
+import { initTelegramWebApp, getTelegramIdFromWebApp, getTelegramIdFromUrl } from './utils/telegramUtils.js';
+import { getApiUrl } from './utils/apiUtils.js';
+import { fetchUserDataByTelegramId, fetchFullUserData, getTelegramIdFromServer } from './utils/userDataUtils.js';
+
 // Инициализация Telegram WebApp
 let tg = null;
 let currentUser = null;
 let userSubscription = null;
 
-// Функция для инициализации Telegram WebApp с ожиданием загрузки
-function initTelegramWebApp() {
-    return new Promise((resolve) => {
-        // Проверяем, доступен ли уже Telegram.WebApp
-        if (window.Telegram?.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-            resolve(tg);
-            return;
-        }
-        
-        // Ждем загрузки Telegram WebApp SDK
-        let attempts = 0;
-        const maxAttempts = 50; // 5 секунд максимум
-        
-        const checkInterval = setInterval(() => {
-            attempts++;
-            if (window.Telegram?.WebApp) {
-                tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
-                clearInterval(checkInterval);
-                resolve(tg);
-            } else if (attempts >= maxAttempts) {
-                clearInterval(checkInterval);
-                console.warn('⚠️ Telegram WebApp не загружен после ожидания');
-                resolve(null);
-            }
-        }, 100);
-    });
-}
-
-// Кэш для проверенного API URL (чтобы не проверять каждый раз)
-let cachedApiUrl = null;
-let apiUrlCheckPromise = null;
-
-// Проверка доступности сервера
-async function checkServerAvailable(url) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // Таймаут 3 секунды
-        
-        const response = await fetch(`${url}/health`, {
-            method: 'GET',
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        return response.ok;
-    } catch (error) {
-        return false;
-    }
-}
-
-// Получение API URL сервера с проверкой доступности
-async function getApiUrl() {
-    // Если уже проверен - возвращаем кэшированный URL
-    if (cachedApiUrl) {
-        return cachedApiUrl;
-    }
-    
-    // Если проверка уже идет - ждем её
-    if (apiUrlCheckPromise) {
-        return await apiUrlCheckPromise;
-    }
-    
-    // Начинаем проверку - ВСЕГДА сначала пробуем localhost, потом production
-    apiUrlCheckPromise = (async () => {
-        const productionUrl = window.API_URL || 'https://tg-ai-f9rj.onrender.com';
-        const localUrl = 'http://localhost:5000';
-        
-        // Маскируем URL в логах
-        const maskUrl = (url) => url ? `***${url.slice(-15)}` : 'не установлен';
-        console.log('🌐 Определение API сервера (сначала проверяем localhost)...');
-        
-        // ВСЕГДА сначала проверяем локальный сервер (для удобства разработки)
-        console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
-        try {
-            const localAvailable = await checkServerAvailable(localUrl);
-            if (localAvailable) {
-                console.log('✅ Локальный сервер доступен, используем его для разработки');
-                cachedApiUrl = localUrl;
-                return localUrl;
-            } else {
-                console.log('⚠️ Локальный сервер недоступен');
-            }
-        } catch (e) {
-            console.log('⚠️ Ошибка проверки локального сервера:', e.message);
-        }
-        
-        // Если локальный сервер недоступен, используем production
-        const maskedProdUrl = maskUrl(productionUrl);
-        console.log('🚀 Используем продакшн API URL:', maskedProdUrl);
-        cachedApiUrl = productionUrl;
-        return productionUrl;
-    })();
-    
-    return await apiUrlCheckPromise;
-}
-
 // Функция для загрузки полных данных пользователя с подпиской
-async function loadFullUserDataFromServer(telegramId) {
+async function loadFullUserDataFromServer(telegramId, initData = null) {
     if (!telegramId) return;
     
     try {
-        // Приоритет localhost для загрузки данных
-        let apiUrl = 'http://localhost:5000';
-        try {
-            // Используем Promise.race для таймаута
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 2000)
-            );
-            const localhostCheck = await Promise.race([
-                fetch(`${apiUrl}/health`, { method: 'GET' }),
-                timeoutPromise
-            ]);
-            if (!localhostCheck.ok) {
-                throw new Error('Localhost недоступен');
-            }
-            console.log('🌐 Используем локальный сервер для загрузки данных (localhost:5000)');
-        } catch (e) {
-            // Если localhost недоступен, используем продакшн
-            apiUrl = await getApiUrl();
-            console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
+        const statusData = await fetchFullUserData(telegramId, initData);
+        
+        if (!statusData) {
+            console.warn('⚠️ Не удалось получить данные с сервера');
+            return;
         }
         
-        const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                telegram_id: telegramId
-            }),
-        });
+        // Проверяем, найден ли пользователь в БД
+        if (statusData.user_not_found) {
+            console.warn('⚠️ Пользователь не найден в БД. Нужно сначала активировать бота через /start');
+            // Показываем сообщение пользователю
+            const userInfoCard = document.getElementById('user-info-card');
+            if (userInfoCard) {
+                const userNameEl = document.getElementById('user-name');
+                if (userNameEl) {
+                    userNameEl.textContent = '❌ Активируйте бота через /start';
+                }
+                const subscriptionStatusEl = document.getElementById('subscription-status');
+                if (subscriptionStatusEl) {
+                    subscriptionStatusEl.textContent = 'Сначала активируйте бота в Telegram';
+                    subscriptionStatusEl.className = 'subscription-status-text inactive';
+                }
+            }
+            return; // Прерываем загрузку
+        }
         
-        if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
+        // Обновляем данные пользователя
+        if (statusData.user) {
+            currentUser = {
+                telegramId: statusData.user.telegram_id || telegramId,
+                firstName: statusData.user.first_name || currentUser?.firstName || 'Пользователь',
+                username: statusData.user.username || currentUser?.username || null,
+                photoUrl: statusData.user.photo_url || currentUser?.photoUrl || null
+            };
             
-            // Обновляем данные пользователя
-            if (statusData.user) {
-                currentUser = {
-                    telegramId: statusData.user.telegram_id || telegramId,
-                    firstName: statusData.user.first_name || 'Пользователь',
-                    username: statusData.user.username || null,
-                    photoUrl: statusData.user.photo_url || null
-                };
-            }
-            
-            // Обновляем статус подписки
-            if (statusData.subscription) {
-                userSubscription = statusData.subscription;
-            }
-            
-            // Обновляем UI
-            updateUserUI(currentUser, userSubscription);
-            updateModeCardsAccess(userSubscription);
-            
-            console.log('✅ Полные данные пользователя загружены:', {
-                telegramId: `***${String(telegramId).slice(-4)}`,
-                hasSubscription: !!userSubscription
+            console.log('✅ Данные пользователя получены с сервера (из БД):', {
+                username: currentUser.username ? `@${currentUser.username}` : 'не указан',
+                firstName: currentUser.firstName,
+                hasPhoto: !!currentUser.photoUrl
             });
+        } else {
+            // Fallback: используем текущие данные если данных нет на сервере
+            console.warn('⚠️ Данные пользователя не найдены на сервере, используем данные из Telegram');
         }
+        
+        // Обновляем статус подписки
+        if (statusData.subscription) {
+            userSubscription = statusData.subscription;
+            console.log('✅ Статус подписки получен:', {
+                is_active: userSubscription.is_active,
+                is_trial: userSubscription.is_trial,
+                days_left: userSubscription.days_left,
+                hours_left: userSubscription.hours_left
+            });
+        } else {
+            console.warn('⚠️ Подписка не найдена в ответе сервера');
+            userSubscription = null;
+        }
+        
+        // Обновляем UI
+        updateUserUI(currentUser, userSubscription);
+        updateModeCardsAccess(userSubscription);
+        
+        console.log('✅ Полные данные пользователя загружены:', {
+            telegramId: `***${String(telegramId).slice(-4)}`,
+            hasSubscription: !!userSubscription
+        });
     } catch (e) {
         console.error('❌ Ошибка загрузки полных данных:', e);
+        // Fallback: используем текущие данные
+        updateUserUI(currentUser, null);
     }
 }
 
-// Загрузка данных пользователя с сервера (переработанная версия)
+// Загрузка данных пользователя с сервера (новая архитектура с утилитами)
 async function loadUserDataFromServer() {
-    // ШАГ 0: Сначала проверяем URL параметры (самый надежный способ если бот передает tg_id)
     let telegramId = null;
     let telegramUser = null;
     
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlTelegramId = urlParams.get('tg_id') || urlParams.get('telegram_id') || urlParams.get('user_id');
-        if (urlTelegramId) {
-            const parsedId = parseInt(urlTelegramId, 10);
-            if (!isNaN(parsedId) && parsedId > 100000000 && parsedId < 999999999999999) {
-                telegramId = parsedId;
-                console.log('✅ Telegram ID получен из URL параметров (приоритет):', `***${String(telegramId).slice(-4)}`);
-                
-                // Сразу загружаем данные с сервера (приоритет localhost)
-                try {
-                    // Сначала пробуем localhost
-                    let apiUrl = 'http://localhost:5000';
-                    try {
-                        // Используем Promise.race для таймаута
-                        const timeoutPromise = new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Timeout')), 2000)
-                        );
-                        const localhostCheck = await Promise.race([
-                            fetch(`${apiUrl}/health`, { method: 'GET' }),
-                            timeoutPromise
-                        ]);
-                        if (!localhostCheck.ok) {
-                            throw new Error('Localhost недоступен');
-                        }
-                        console.log('🌐 Используем локальный сервер (localhost:5000)');
-                    } catch (e) {
-                        // Если localhost недоступен, используем продакшн
-                        apiUrl = await getApiUrl();
-                        console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
-                    }
-                    
-                    const statusResponse = await fetch(`${apiUrl}/api/user/status?telegram_id=${telegramId}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                    });
-                    
-                    if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
-                        if (statusData.user) {
-                            telegramUser = {
-                                id: telegramId,
-                                first_name: statusData.user.first_name || 'Пользователь',
-                                username: statusData.user.username || null,
-                                photo_url: statusData.user.photo_url || null
-                            };
-                            console.log('✅ Данные пользователя получены через GET запрос:', `***${String(telegramId).slice(-4)}`);
-                            
-                            // Обновляем UI сразу
-                            currentUser = {
-                                telegramId: telegramId,
-                                firstName: telegramUser.first_name || 'Пользователь',
-                                username: telegramUser.username || null,
-                                photoUrl: telegramUser.photo_url || null
-                            };
-                            updateUserUI(currentUser, null);
-                            
-                            // Загружаем полные данные с подпиской
-                            await loadFullUserDataFromServer(telegramId);
-                            return; // Выходим, данные уже получены
-                        }
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Ошибка получения данных через GET запрос:', e);
-                }
-            }
+    // ШАГ 0: Приоритет - URL параметры (бот передает tg_id)
+    telegramId = getTelegramIdFromUrl();
+    
+    if (telegramId) {
+        // Если получили ID из URL, сразу загружаем данные с сервера
+        const statusData = await fetchUserDataByTelegramId(telegramId);
+        
+        if (statusData && statusData.user) {
+            telegramUser = {
+                id: telegramId,
+                first_name: statusData.user.first_name || 'Пользователь',
+                username: statusData.user.username || null,
+                photo_url: statusData.user.photo_url || null
+            };
+            
+            // Обновляем UI сразу
+            currentUser = {
+                telegramId: telegramId,
+                firstName: telegramUser.first_name || 'Пользователь',
+                username: telegramUser.username || null,
+                photoUrl: telegramUser.photo_url || null
+            };
+            updateUserUI(currentUser, null);
+            
+            // Загружаем полные данные с подпиской
+            await loadFullUserDataFromServer(telegramId);
+            return; // Выходим, данные уже получены
         }
-    } catch (e) {
-        console.warn('⚠️ Ошибка получения ID из URL:', e);
     }
     
-    // ШАГ 1: Инициализируем Telegram WebApp и ждем его загрузки
+    // ШАГ 1: Инициализируем Telegram WebApp
     const webApp = await initTelegramWebApp();
     
     if (!webApp) {
@@ -266,189 +137,19 @@ async function loadUserDataFromServer() {
         return;
     }
     
-    // Если telegramId еще не получен из URL, пробуем другие способы
-    // Способ 1: Получаем данные из initDataUnsafe (рекомендуемый способ)
-    // Добавляем детальное логирование для диагностики
-    if (webApp.initDataUnsafe) {
-        console.log('🔍 Проверка initDataUnsafe:', {
-            hasInitDataUnsafe: true,
-            hasUser: !!webApp.initDataUnsafe.user,
-            userKeys: webApp.initDataUnsafe.user ? Object.keys(webApp.initDataUnsafe.user) : [],
-            userId: webApp.initDataUnsafe.user?.id,
-            userType: typeof webApp.initDataUnsafe.user?.id,
-            userValue: webApp.initDataUnsafe.user?.id
-        });
+    // ШАГ 2: Пробуем получить данные из WebApp (если еще не получили из URL)
+    if (!telegramId) {
+        const result = getTelegramIdFromWebApp(webApp);
+        telegramId = result.telegramId;
+        telegramUser = result.telegramUser;
     }
     
-    // Пробуем получить user.id напрямую
-    if (webApp.initDataUnsafe?.user) {
-        telegramUser = webApp.initDataUnsafe.user;
-        
-        // Детальное логирование структуры user
-        console.log('🔍 Детальная структура initDataUnsafe.user:', {
-            keys: Object.keys(telegramUser),
-            values: Object.entries(telegramUser).reduce((acc, [key, val]) => {
-                // Маскируем длинные значения
-                if (typeof val === 'string' && val.length > 20) {
-                    acc[key] = `${val.substring(0, 20)}...`;
-                } else {
-                    acc[key] = val;
-                }
-                return acc;
-            }, {})
-        });
-        
-        // Проверяем разные варианты получения ID (стандартное поле Telegram - id)
-        telegramId = telegramUser.id;
-        
-        // Если id отсутствует, пробуем альтернативные варианты
-        if (!telegramId && telegramUser.user_id) {
-            telegramId = telegramUser.user_id;
-            console.log('⚠️ Используем альтернативное поле user_id');
-        }
-        if (!telegramId && telegramUser.userId) {
-            telegramId = telegramUser.userId;
-            console.log('⚠️ Используем альтернативное поле userId');
-        }
-        
-        // Если ID в виде строки, пробуем преобразовать в число
-        if (telegramId && typeof telegramId === 'string') {
-            const parsedId = parseInt(telegramId, 10);
-            if (!isNaN(parsedId)) {
-                telegramId = parsedId;
-            }
-        }
-        
-        // Проверяем что id есть и это валидное число
-        if (telegramId && (typeof telegramId === 'number' || (typeof telegramId === 'string' && /^\d+$/.test(String(telegramId))))) {
-            telegramId = parseInt(telegramId, 10);
-            console.log('✅ Telegram ID получен из initDataUnsafe.user.id:', `***${String(telegramId).slice(-4)}`);
-        } else {
-            console.warn('⚠️ initDataUnsafe.user.id не является валидным ID');
-            console.warn('🔍 Полная структура user (для отладки):', JSON.stringify(telegramUser, null, 2));
-            
-            // Последняя попытка - ищем любое числовое значение, похожее на ID
-            for (const key in telegramUser) {
-                const value = telegramUser[key];
-                if (value && (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(String(value))))) {
-                    const potentialId = parseInt(value, 10);
-                    // Telegram ID обычно больше 100000000 (9 цифр)
-                    if (!isNaN(potentialId) && potentialId > 100000000 && potentialId < 999999999999999) {
-                        telegramId = potentialId;
-                        console.log(`✅ Telegram ID найден в поле ${key}:`, `***${String(telegramId).slice(-4)}`);
-                        break;
-                    }
-                }
-            }
-        }
-    } else {
-        console.warn('⚠️ initDataUnsafe.user недоступен');
-        console.warn('🔍 initDataUnsafe структура:', {
-            hasInitDataUnsafe: !!webApp.initDataUnsafe,
-            keys: webApp.initDataUnsafe ? Object.keys(webApp.initDataUnsafe) : []
-        });
-    }
-    
-    // Способ 2: Если initDataUnsafe не сработал, парсим initData напрямую
-    if (!telegramId && webApp.initData) {
-        try {
-            console.log('🔍 Пробуем парсить initData напрямую...');
-            
-            // Парсим initData (формат: user=...&auth_date=...&hash=...)
-            const params = new URLSearchParams(webApp.initData);
-            const userParam = params.get('user');
-            
-            if (userParam) {
-                // Декодируем и парсим JSON
-                const userJson = decodeURIComponent(userParam);
-                telegramUser = JSON.parse(userJson);
-                telegramId = telegramUser.id;
-                console.log('✅ Telegram ID получен из initData парсинга:', `***${String(telegramId).slice(-4)}`);
-            } else {
-                console.warn('⚠️ Параметр "user" не найден в initData');
-            }
-        } catch (e) {
-            console.error('❌ Ошибка парсинга initData:', e);
-        }
-    }
-    
-    // Способ 3: Альтернативный парсинг initData (если стандартный не сработал)
-    if (!telegramId && webApp.initData) {
-        try {
-            // Пробуем найти user= в строке напрямую
-            const userMatch = webApp.initData.match(/user=([^&]+)/);
-            if (userMatch && userMatch[1]) {
-                const userJson = decodeURIComponent(userMatch[1]);
-                telegramUser = JSON.parse(userJson);
-                telegramId = telegramUser.id;
-                console.log('✅ Telegram ID получен из альтернативного парсинга:', `***${String(telegramId).slice(-4)}`);
-            }
-        } catch (e) {
-            console.error('❌ Ошибка альтернативного парсинга:', e);
-        }
-    }
-    
-    // Способ 4 удален - уже обработано в ШАГ 0 в начале функции
-    
-    // Способ 5: Если initData есть, пробуем получить через сервер с валидацией initData
+    // ШАГ 3: Если все еще не получили, пробуем через сервер с валидацией initData
     if (!telegramId && webApp.initData && webApp.initData.length > 0) {
-        console.log('🔍 Пробуем получить telegram_id через сервер с валидацией initData...', {
-            hasInitData: !!webApp.initData,
-            initDataLength: webApp.initData?.length || 0
-        });
-        try {
-            // Приоритет localhost
-            let apiUrl = 'http://localhost:5000';
-            try {
-                // Используем Promise.race для таймаута
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 2000)
-                );
-                const localhostCheck = await Promise.race([
-                    fetch(`${apiUrl}/health`, { method: 'GET' }),
-                    timeoutPromise
-                ]);
-                if (!localhostCheck.ok) {
-                    throw new Error('Localhost недоступен');
-                }
-                console.log('🌐 Используем локальный сервер (localhost:5000)');
-            } catch (e) {
-                // Если localhost недоступен, используем продакшн
-                apiUrl = await getApiUrl();
-                console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
-            }
-            
-            const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    initData: webApp.initData
-                }),
-            });
-            
-            if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
-                if (statusData.user && statusData.user.telegram_id) {
-                    telegramId = statusData.user.telegram_id;
-                    telegramUser = {
-                        id: telegramId,
-                        first_name: statusData.user.first_name || 'Пользователь',
-                        username: statusData.user.username || null,
-                        photo_url: statusData.user.photo_url || null
-                    };
-                    console.log('✅ Telegram ID получен через сервер:', `***${String(telegramId).slice(-4)}`);
-                } else if (statusData.error) {
-                    console.warn('⚠️ Сервер вернул ошибку:', statusData.error);
-                }
-            } else {
-                const errorText = await statusResponse.text().catch(() => 'Unknown error');
-                console.warn('⚠️ Ошибка ответа сервера:', statusResponse.status, errorText);
-            }
-        } catch (e) {
-            console.error('❌ Ошибка получения ID через сервер:', e);
-        }
+        console.log('🔍 Пробуем получить telegram_id через сервер с валидацией initData...');
+        const result = await getTelegramIdFromServer(webApp.initData);
+        telegramId = result.telegramId;
+        telegramUser = result.telegramUser;
     }
     
     // Если не удалось получить данные, показываем заглушку с инструкцией
@@ -501,151 +202,8 @@ async function loadUserDataFromServer() {
         username: currentUser.username ? `@${currentUser.username}` : 'не указан'
     });
 
-    // ШАГ 2: Загружаем данные пользователя и статус подписки с сервера по telegram_id
-    // Отправляем только telegram_id, остальное сервер получит из БД
-    // Приоритет localhost
-    let apiUrl = 'http://localhost:5000';
-    try {
-        // Используем Promise.race для таймаута
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 2000)
-        );
-        const localhostCheck = await Promise.race([
-            fetch(`${apiUrl}/health`, { method: 'GET' }),
-            timeoutPromise
-        ]);
-        if (!localhostCheck.ok) {
-            throw new Error('Localhost недоступен');
-        }
-        console.log('🌐 Используем локальный сервер для загрузки данных (localhost:5000)');
-    } catch (e) {
-        // Если localhost недоступен, используем продакшн
-        apiUrl = await getApiUrl();
-        console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
-    }
-    
-    try {
-        // Получаем initData для валидации на сервере (только для безопасности)
-        const initDataForServer = webApp.initData || null;
-        
-        console.log('📡 Запрос к серверу для получения данных пользователя по telegram_id...', {
-            telegramId: `***${String(telegramId).slice(-4)}`,
-            apiUrl: apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1')
-        });
-        
-        const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                telegram_id: telegramId,
-                initData: initDataForServer  // Для валидации, если нужно
-            }),
-        });
-
-        if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            
-            // Проверяем, найден ли пользователь в БД
-            if (statusData.user_not_found) {
-                console.warn('⚠️ Пользователь не найден в БД. Нужно сначала активировать бота через /start');
-                // Показываем сообщение пользователю
-                const userInfoCard = document.getElementById('user-info-card');
-                if (userInfoCard) {
-                    const userNameEl = document.getElementById('user-name');
-                    if (userNameEl) {
-                        userNameEl.textContent = '❌ Активируйте бота через /start';
-                    }
-                    const subscriptionStatusEl = document.getElementById('subscription-status');
-                    if (subscriptionStatusEl) {
-                        subscriptionStatusEl.textContent = 'Сначала активируйте бота в Telegram';
-                        subscriptionStatusEl.className = 'subscription-status-text inactive';
-                    }
-                }
-                return; // Прерываем загрузку, не обновляем UI дальше
-            }
-            
-            // Формируем объект пользователя из ответа сервера
-            if (statusData.user) {
-                // Приоритет отдаем данным с сервера (из БД)
-                currentUser = {
-                    telegramId: statusData.user.telegram_id || telegramId,
-                    firstName: statusData.user.first_name || currentUser?.firstName || telegramUser?.first_name || 'Пользователь',
-                    username: statusData.user.username || currentUser?.username || telegramUser?.username || null,
-                    photoUrl: statusData.user.photo_url || currentUser?.photoUrl || telegramUser?.photo_url || null
-                };
-                
-                console.log('✅ Данные пользователя получены с сервера (из БД):', {
-                    username: currentUser.username ? `@${currentUser.username}` : 'не указан',
-                    firstName: currentUser.firstName,
-                    hasPhoto: !!currentUser.photoUrl
-                });
-            } else {
-                // Fallback: используем данные из Telegram если данных нет на сервере
-                console.warn('⚠️ Данные пользователя не найдены на сервере, используем данные из Telegram');
-                currentUser = {
-                    telegramId: telegramId,
-                    firstName: currentUser?.firstName || telegramUser?.first_name || 'Пользователь',
-                    username: currentUser?.username || telegramUser?.username || null,
-                    photoUrl: currentUser?.photoUrl || telegramUser?.photo_url || null
-                };
-            }
-            
-            // Обновляем статус подписки
-            if (statusData.subscription) {
-                userSubscription = statusData.subscription;
-                console.log('✅ Статус подписки получен:', {
-                    is_active: userSubscription.is_active,
-                    is_trial: userSubscription.is_trial,
-                    days_left: userSubscription.days_left,
-                    hours_left: userSubscription.hours_left
-                });
-            } else {
-                console.warn('⚠️ Подписка не найдена в ответе сервера');
-                userSubscription = null;
-            }
-            
-        } else {
-            const errorText = await statusResponse.text().catch(() => 'Неизвестная ошибка');
-            console.warn('⚠️ Ошибка получения статуса с сервера:', statusResponse.status, errorText);
-            
-            // Используем базовые данные только с telegramId
-            currentUser = {
-                telegramId: telegramId,
-                firstName: 'Пользователь',
-                username: null,
-                photoUrl: null
-            };
-            userSubscription = null;
-        }
-
-    } catch (error) {
-        console.error('❌ Ошибка загрузки данных с сервера:', error);
-        // Fallback: используем telegramId
-        currentUser = {
-            telegramId: telegramId,
-            firstName: 'Пользователь',
-            username: null,
-            photoUrl: null
-        };
-        userSubscription = null;
-    }
-
-    // Обновляем UI с полученными данными
-    if (currentUser && currentUser.telegramId) {
-        updateUserUI(currentUser, userSubscription);
-        updateModeCardsAccess(userSubscription);
-    } else {
-        console.error('❌ Не удалось загрузить данные пользователя');
-        // Показываем заглушку
-        updateUserUI({
-            telegramId: null,
-            firstName: 'Пользователь',
-            username: null,
-            photoUrl: null
-        }, null);
-    }
+    // ШАГ 4: Загружаем полные данные с сервера (подписка, данные из БД)
+    await loadFullUserDataFromServer(telegramId, webApp.initData || null);
 }
 
 // Обновление доступности карточек режимов в зависимости от подписки
