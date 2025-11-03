@@ -8,13 +8,15 @@ function copyJsFiles() {
   return {
     name: 'copy-js-files',
     writeBundle() {
-      const filesToCopy = ['main.js', 'generation.js', 'app.js', 'theme.js'];
+      const filesToCopy = ['main.js', 'generation.js', 'app.js', 'theme.js', 'admin.js'];
       filesToCopy.forEach(file => {
         const src = path.resolve(__dirname, file);
         const dest = path.resolve(__dirname, 'dist', file);
         if (existsSync(src)) {
           copyFileSync(src, dest);
           console.log(`✅ Скопирован ${file} в dist/`);
+        } else {
+          console.warn(`⚠️ Файл ${file} не найден для копирования`);
         }
       });
       
@@ -24,6 +26,18 @@ function copyJsFiles() {
       if (existsSync(adminHtml)) {
         copyFileSync(adminHtml, adminHtmlDest);
         console.log(`✅ Скопирован admin.html в dist/`);
+      } else {
+        console.warn(`⚠️ admin.html не найден для копирования`);
+      }
+      
+      // Копируем style.css в dist если он существует (для админки)
+      const styleCss = path.resolve(__dirname, 'style.css');
+      const styleCssDest = path.resolve(__dirname, 'dist', 'style.css');
+      if (existsSync(styleCss)) {
+        copyFileSync(styleCss, styleCssDest);
+        console.log(`✅ Скопирован style.css в dist/`);
+      } else {
+        console.warn(`⚠️ style.css не найден для копирования`);
       }
     }
   };
