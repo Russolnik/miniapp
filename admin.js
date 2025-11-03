@@ -3,6 +3,8 @@ const ADMIN_PASSWORD = '240123';
 let currentEditingUser = null;
 let originalUserData = null;
 let pendingAction = null; // Сохраняем действие для подтверждения
+let pendingChanges = []; // Список накопленных изменений
+let pendingActions = []; // Список функций для выполнения
 
 // Получение API URL (сначала localhost, потом production)
 async function getApiUrl() {
@@ -198,6 +200,12 @@ async function adminShowUserInfo(searchTerm) {
     infoDiv.style.display = 'block';
     contentDiv.innerHTML = '<p>Загрузка...</p>';
     
+    // Сбрасываем накопленные изменения при загрузке нового пользователя
+    if (currentEditingUser?.telegram_id !== searchTerm) {
+        pendingChanges = [];
+        pendingActions = [];
+    }
+    
     try {
         const response = await fetch(`${apiUrl}/api/admin/users/search`, {
             method: 'POST',
@@ -342,6 +350,23 @@ function renderUserInfo(user, container) {
         html += '</div></div>';
     }
     
+    // Кнопки применения/отмены всех изменений
+    if (pendingChanges.length > 0) {
+        html += '<div class="admin-final-actions" style="margin-top: 24px; padding-top: 24px; border-top: 2px solid rgba(79, 195, 247, 0.3);">';
+        html += '<h3 style="margin-bottom: 16px; font-size: 18px;">📋 Накопленные изменения</h3>';
+        html += '<div class="pending-changes-list" style="background: rgba(79, 195, 247, 0.1); border-radius: 12px; padding: 16px; margin-bottom: 16px;">';
+        pendingChanges.forEach((change, index) => {
+            html += `<div style="padding: 8px 0; border-bottom: 1px solid rgba(79, 195, 247, 0.2);">`;
+            html += `<strong>${change.label}:</strong> ${change.description}`;
+            html += `</div>`;
+        });
+        html += '</div>';
+        html += '<div class="admin-final-buttons" style="display: flex; gap: 12px;">';
+        html += `<button class="admin-btn admin-btn-danger" onclick="cancelAllChanges(${user.telegram_id})">❌ Отменить все изменения</button>`;
+        html += `<button class="admin-btn admin-btn-success" onclick="applyAllChanges(${user.telegram_id})">✅ Применить все изменения</button>`;
+        html += '</div></div>';
+    }
+    
     html += '</div>';
     container.innerHTML = html;
 }
@@ -395,18 +420,19 @@ async function adminActivateTrial(telegramId) {
     
     const oldTrialStatus = currentEditingUser.trial_status?.is_active ? 'Активен' : (currentEditingUser.trial_status?.trial_used ? 'Использован' : 'Не активен');
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Пробный период',
-        old: oldTrialStatus,
-        new: 'Активен (24 часа)'
-    }];
+        description: `${oldTrialStatus} → Активен (24 часа)`,
+        action: () => executeActivateTrial(telegramId)
+    });
     
-    showConfirmModal(
-        'Активировать пробный период',
-        `Вы уверены, что хотите активировать пробный период для пользователя ${telegramId}?`,
-        changes,
-        () => executeActivateTrial(telegramId)
-    );
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification('✅ Изменение добавлено. Нажмите "Применить все изменения" в конце страницы.', 'success');
 }
 
 async function executeActivateTrial(telegramId) {
@@ -441,18 +467,19 @@ async function adminDeactivateTrial(telegramId) {
     
     const oldTrialStatus = currentEditingUser.trial_status?.is_active ? 'Активен' : (currentEditingUser.trial_status?.trial_used ? 'Использован' : 'Не активен');
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Пробный период',
-        old: oldTrialStatus,
-        new: 'Удален'
-    }];
+        description: `${oldTrialStatus} → Удален`,
+        action: () => executeDeactivateTrial(telegramId)
+    });
     
-    showConfirmModal(
-        'Удалить пробный период',
-        `Вы уверены, что хотите удалить пробный период для пользователя ${telegramId}?`,
-        changes,
-        () => executeDeactivateTrial(telegramId)
-    );
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification('✅ Изменение добавлено. Нажмите "Применить все изменения" в конце страницы.', 'success');
 }
 
 async function executeDeactivateTrial(telegramId) {
@@ -504,18 +531,19 @@ async function adminCreateSubscription(subscriptionType, telegramId) {
     const newEndDate = new Date(oldEndDate);
     newEndDate.setMonth(newEndDate.getMonth() + monthsToAdd);
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Подписка',
-        old: oldStatus,
-        new: `${oldSubscription ? 'Продлена до' : 'Добавлена'} ${formatDate(newEndDate.toISOString())}`
-    }];
+        description: `${oldStatus} → ${oldSubscription ? 'Продлена до' : 'Добавлена'} ${formatDate(newEndDate.toISOString())}`,
+        action: () => executeCreateSubscription(subscriptionType, telegramId)
+    });
     
-    showConfirmModal(
-        'Добавить подписку',
-        `Добавить подписку ${typeNames[subscriptionType]} пользователю ${telegramId}?`,
-        changes,
-        () => executeCreateSubscription(subscriptionType, telegramId)
-    );
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification(`✅ Изменение добавлено (${typeNames[subscriptionType]}). Нажмите "Применить все изменения" в конце страницы.`, 'success');
 }
 
 async function executeCreateSubscription(subscriptionType, telegramId) {
@@ -549,18 +577,19 @@ async function adminPauseSubscription(telegramId) {
         return;
     }
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Статус подписки',
-        old: 'Активна',
-        new: 'На паузе'
-    }];
+        description: 'Активна → На паузе',
+        action: () => executePauseSubscription(telegramId)
+    });
     
-    showConfirmModal(
-        'Поставить подписку на паузу',
-        `Поставить подписку пользователя ${telegramId} на паузу?`,
-        changes,
-        () => executePauseSubscription(telegramId)
-    );
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification('✅ Изменение добавлено. Нажмите "Применить все изменения" в конце страницы.', 'success');
 }
 
 async function executePauseSubscription(telegramId) {
@@ -593,18 +622,19 @@ async function adminResumeSubscription(telegramId) {
         return;
     }
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Статус подписки',
-        old: 'На паузе',
-        new: 'Активна'
-    }];
+        description: 'На паузе → Активна',
+        action: () => executeResumeSubscription(telegramId)
+    });
     
-    showConfirmModal(
-        'Возобновить подписку',
-        `Возобновить подписку пользователя ${telegramId}?`,
-        changes,
-        () => executeResumeSubscription(telegramId)
-    );
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification('✅ Изменение добавлено. Нажмите "Применить все изменения" в конце страницы.', 'success');
 }
 
 async function executeResumeSubscription(telegramId) {
@@ -642,17 +672,83 @@ async function adminStopSubscription(telegramId) {
         `${oldSubscription.type} (до ${formatDate(oldSubscription.end_date)})` : 
         'Нет подписки';
     
-    const changes = [{
+    // Добавляем в список накопленных изменений
+    pendingChanges.push({
         label: 'Подписка',
-        old: oldStatus,
-        new: 'Остановлена'
-    }];
+        description: `${oldStatus} → Остановлена`,
+        action: () => executeStopSubscription(telegramId)
+    });
+    
+    // Обновляем UI с новыми кнопками
+    if (document.getElementById('admin-user-info-content')) {
+        renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+    }
+    
+    showNotification('✅ Изменение добавлено. Нажмите "Применить все изменения" в конце страницы.', 'success');
+}
+
+// Применить все накопленные изменения
+async function applyAllChanges(telegramId) {
+    if (pendingChanges.length === 0) {
+        showNotification('Нет изменений для применения', 'error');
+        return;
+    }
+    
+    // Показываем модальное окно подтверждения с полным списком изменений
+    const changes = pendingChanges.map(change => ({
+        label: change.label,
+        old: change.description.split(' → ')[0] || '—',
+        new: change.description.split(' → ')[1] || '—'
+    }));
     
     showConfirmModal(
-        '⚠️ Остановить подписку',
-        `ВНИМАНИЕ! Вы уверены, что хотите остановить подписку пользователя ${telegramId}?\n\nЭто действие нельзя отменить!`,
+        'Применить все изменения',
+        `Вы уверены, что хотите применить все ${pendingChanges.length} изменений для пользователя ${telegramId}?`,
         changes,
-        () => executeStopSubscription(telegramId)
+        async () => {
+            // Выполняем все действия последовательно
+            for (const change of pendingChanges) {
+                try {
+                    await change.action();
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Небольшая задержка между запросами
+                } catch (error) {
+                    console.error('Ошибка при применении изменения:', error);
+                    showNotification(`❌ Ошибка при применении изменения: ${change.label}`, 'error');
+                }
+            }
+            
+            // Очищаем список изменений
+            pendingChanges = [];
+            pendingActions = [];
+            
+            // Обновляем информацию о пользователе
+            setTimeout(() => adminShowUserInfo(telegramId), 1000);
+        }
+    );
+}
+
+// Отменить все накопленные изменения
+function cancelAllChanges(telegramId) {
+    if (pendingChanges.length === 0) {
+        showNotification('Нет изменений для отмены', 'error');
+        return;
+    }
+    
+    showConfirmModal(
+        'Отменить все изменения',
+        `Вы уверены, что хотите отменить все ${pendingChanges.length} накопленных изменений?`,
+        null,
+        () => {
+            pendingChanges = [];
+            pendingActions = [];
+            
+            // Обновляем UI без изменений
+            if (document.getElementById('admin-user-info-content')) {
+                renderUserInfo(currentEditingUser, document.getElementById('admin-user-info-content'));
+            }
+            
+            showNotification('✅ Все изменения отменены', 'success');
+        }
     );
 }
 
@@ -743,6 +839,8 @@ window.adminPauseSubscription = adminPauseSubscription;
 window.adminResumeSubscription = adminResumeSubscription;
 window.adminStopSubscription = adminStopSubscription;
 window.closeConfirmModal = closeConfirmModal;
+window.applyAllChanges = applyAllChanges;
+window.cancelAllChanges = cancelAllChanges;
 
 // Инициализация Telegram WebApp
 if (window.Telegram && window.Telegram.WebApp) {

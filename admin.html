@@ -381,12 +381,53 @@
             border-color: var(--night-border);
             color: var(--night-text-primary);
         }
+        
+        /* Кнопка переключения темы на странице ввода пароля */
+        .theme-toggle-btn-admin {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(79, 195, 247, 0.1);
+            border: 2px solid rgba(79, 195, 247, 0.3);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 20px;
+            z-index: 10;
+        }
+        
+        .theme-toggle-btn-admin:hover {
+            background: rgba(79, 195, 247, 0.2);
+            border-color: var(--sky-blue);
+            transform: scale(1.1);
+        }
+        
+        .theme-night .theme-toggle-btn-admin,
+        [data-theme="night"] .theme-toggle-btn-admin {
+            background: rgba(63, 81, 181, 0.2);
+            border-color: var(--night-border);
+        }
+        
+        .theme-night .theme-toggle-btn-admin:hover,
+        [data-theme="night"] .theme-toggle-btn-admin:hover {
+            background: rgba(63, 81, 181, 0.3);
+        }
     </style>
 </head>
 <body>
     <!-- Форма ввода пароля -->
     <div id="password-form" class="admin-password-container">
         <div class="admin-password-card">
+            <!-- Кнопка переключения темы на странице ввода пароля -->
+            <button class="theme-toggle-btn-admin" onclick="window.themeManager?.toggleTheme()" title="Переключить тему">
+                <span id="theme-icon-password">🌓</span>
+            </button>
+            
             <div class="admin-header">
                 <h1>🔒 Админ-панель</h1>
                 <p>Введите пароль для доступа</p>
@@ -397,7 +438,7 @@
                 <div id="error-message" style="display: none; background: #fee; color: #c33; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
                     Неверный пароль. Попробуйте снова.
                 </div>
-                <button class="btn btn-primary" onclick="checkPassword()" style="width: 100%;">Войти</button>
+                <button class="admin-btn" onclick="checkPassword()" style="width: 100%;">Войти</button>
             </div>
         </div>
     </div>
@@ -444,8 +485,8 @@
                 <div class="admin-search-container">
                     <input type="text" id="admin-search-user" class="admin-search-input" placeholder="Поиск по Telegram ID или username..." autocomplete="off">
                 </div>
-                <button class="btn btn-primary" onclick="adminSearchUser()" style="width: 100%; margin-bottom: 10px;">Найти</button>
-                <button class="btn" onclick="adminLoadUsersList()" style="width: 100%; background: #42a5f5; color: white;">📋 Загрузить всех пользователей</button>
+                <button class="admin-btn" onclick="adminSearchUser()" style="width: 100%; margin-bottom: 10px;">🔍 Найти</button>
+                <button class="admin-btn" onclick="adminLoadUsersList()" style="width: 100%;">📋 Загрузить всех пользователей</button>
                 
                 <!-- Результаты поиска -->
                 <div id="admin-users-list" style="display: none; margin-top: 20px; max-height: 400px; overflow-y: auto;"></div>
