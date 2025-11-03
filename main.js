@@ -303,27 +303,48 @@ async function loadUserDataFromServer() {
         if (statusResponse.ok) {
             const statusData = await statusResponse.json();
             
+            // Проверяем, найден ли пользователь в БД
+            if (statusData.user_not_found) {
+                console.warn('⚠️ Пользователь не найден в БД. Нужно сначала активировать бота через /start');
+                // Показываем сообщение пользователю
+                const userInfoCard = document.getElementById('user-info-card');
+                if (userInfoCard) {
+                    const userNameEl = document.getElementById('user-name');
+                    if (userNameEl) {
+                        userNameEl.textContent = '❌ Активируйте бота через /start';
+                    }
+                    const subscriptionStatusEl = document.getElementById('subscription-status');
+                    if (subscriptionStatusEl) {
+                        subscriptionStatusEl.textContent = 'Сначала активируйте бота в Telegram';
+                        subscriptionStatusEl.className = 'subscription-status-text inactive';
+                    }
+                }
+                return; // Прерываем загрузку, не обновляем UI дальше
+            }
+            
             // Формируем объект пользователя из ответа сервера
             if (statusData.user) {
+                // Приоритет отдаем данным с сервера (из БД)
                 currentUser = {
                     telegramId: statusData.user.telegram_id || telegramId,
-                    firstName: statusData.user.first_name || 'Пользователь',
-                    username: statusData.user.username || null,
-                    photoUrl: statusData.user.photo_url || null
+                    firstName: statusData.user.first_name || currentUser?.firstName || telegramUser?.first_name || 'Пользователь',
+                    username: statusData.user.username || currentUser?.username || telegramUser?.username || null,
+                    photoUrl: statusData.user.photo_url || currentUser?.photoUrl || telegramUser?.photo_url || null
                 };
                 
-                console.log('✅ Данные пользователя получены с сервера:', {
+                console.log('✅ Данные пользователя получены с сервера (из БД):', {
                     username: currentUser.username ? `@${currentUser.username}` : 'не указан',
                     firstName: currentUser.firstName,
                     hasPhoto: !!currentUser.photoUrl
                 });
             } else {
-                // Fallback: используем telegramId если данных пользователя нет в ответе
+                // Fallback: используем данные из Telegram если данных нет на сервере
+                console.warn('⚠️ Данные пользователя не найдены на сервере, используем данные из Telegram');
                 currentUser = {
                     telegramId: telegramId,
-                    firstName: 'Пользователь',
-                    username: null,
-                    photoUrl: null
+                    firstName: currentUser?.firstName || telegramUser?.first_name || 'Пользователь',
+                    username: currentUser?.username || telegramUser?.username || null,
+                    photoUrl: currentUser?.photoUrl || telegramUser?.photo_url || null
                 };
             }
             
