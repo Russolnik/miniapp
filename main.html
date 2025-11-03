@@ -74,9 +74,11 @@
                 <p>Голосовое общение с AI через микрофон</p>
             </div>
             
-            <div class="mode-card" id="generation-card" onclick="openGenerationPage()">
+            <div class="mode-card generation-card-disabled" id="generation-card" onclick="showGenerationDisabled()">
                 <div class="mode-icon">🎨</div>
+                <div class="lock-icon">🔒</div>
                 <h3>Генерация изображений</h3>
+                <p class="development-badge">В разработке</p>
                 <p>Создание изображений на основе текста и фото</p>
             </div>
         </div>
@@ -99,6 +101,19 @@
                 return false;
             }
             window.openGenerationPage = openGenerationPage;
+        }
+        
+        if (typeof showGenerationDisabled === 'undefined') {
+            function showGenerationDisabled() {
+                const message = '🚫 Генерация изображений в разработке\n\nЭта функция временно недоступна и находится в стадии разработки.\n\nСледите за обновлениями!';
+                
+                if (window.Telegram?.WebApp) {
+                    window.Telegram.WebApp.showAlert(message);
+                } else {
+                    alert(message);
+                }
+            }
+            window.showGenerationDisabled = showGenerationDisabled;
         }
         
         if (typeof showAboutPage === 'undefined') {

@@ -218,38 +218,14 @@ function updateModeCardsAccess(subscription) {
         }
     }
     
-    // Карточка Generation
-    const generationCard = document.getElementById('generation-card') || 
-                           document.querySelector('.mode-card[onclick*="openGenerationPage"]');
-    
+    // Карточка Generation - всегда недоступна, в разработке
+    const generationCard = document.getElementById('generation-card');
     if (generationCard) {
-        if (!hasActiveSubscription) {
-            generationCard.classList.add('disabled');
-            generationCard.style.opacity = '0.6';
-            generationCard.style.cursor = 'not-allowed';
-            generationCard.setAttribute('onclick', 'checkSubscriptionAndOpen("generation")');
-            
-            // Добавляем бейдж "Требуется подписка"
-            if (!generationCard.querySelector('.subscription-badge')) {
-                const badge = document.createElement('div');
-                badge.className = 'subscription-badge';
-                badge.style.cssText = 'position: absolute; top: 8px; right: 8px; background: #f44336; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;';
-                badge.textContent = 'Требуется подписка';
-                generationCard.style.position = 'relative';
-                generationCard.appendChild(badge);
-            }
-        } else {
-            generationCard.classList.remove('disabled');
-            generationCard.style.opacity = '1';
-            generationCard.style.cursor = 'pointer';
-            generationCard.setAttribute('onclick', 'openGenerationPage()');
-            
-            // Удаляем бейдж если есть
-            const badge = generationCard.querySelector('.subscription-badge');
-            if (badge) {
-                badge.remove();
-            }
-        }
+        // Всегда показываем как недоступную
+        generationCard.classList.add('generation-card-disabled');
+        generationCard.style.opacity = '0.6';
+        generationCard.style.cursor = 'not-allowed';
+        generationCard.setAttribute('onclick', 'showGenerationDisabled()');
     }
 }
 
@@ -447,10 +423,22 @@ function openSubscriptionPage() {
 // Делаем функцию глобальной
 window.openSubscriptionPage = openSubscriptionPage;
 
+// Функция для показа сообщения о недоступности Generation
+function showGenerationDisabled() {
+    const message = '🚫 **Генерация изображений в разработке**\n\nЭта функция временно недоступна и находится в стадии разработки.\n\nСледите за обновлениями!';
+    
+    if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(message);
+    } else {
+        alert(message);
+    }
+}
+
 // Делаем функции глобальными для доступа из HTML
 window.openLivePage = openLivePage;
 window.openGenerationPage = openGenerationPage;
 window.showAboutPage = showAboutPage;
+window.showGenerationDisabled = showGenerationDisabled;
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async () => {
