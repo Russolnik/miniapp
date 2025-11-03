@@ -72,6 +72,20 @@ async function loadFullUserDataFromServer(telegramId, initData = null) {
             userSubscription = null;
         }
         
+        // Сохраняем данные в sessionStorage для передачи между страницами
+        if (currentUser && currentUser.telegramId) {
+            sessionStorage.setItem('telegramId', String(currentUser.telegramId));
+            sessionStorage.setItem('userData', JSON.stringify({
+                telegramId: currentUser.telegramId,
+                firstName: currentUser.firstName,
+                username: currentUser.username,
+                photoUrl: currentUser.photoUrl
+            }));
+        }
+        if (userSubscription) {
+            sessionStorage.setItem('subscription', JSON.stringify(userSubscription));
+        }
+        
         // Обновляем UI
         updateUserUI(currentUser, userSubscription);
         updateModeCardsAccess(userSubscription);
@@ -91,6 +105,37 @@ async function loadFullUserDataFromServer(telegramId, initData = null) {
 async function loadUserDataFromServer() {
     let telegramId = null;
     let telegramUser = null;
+    
+    // Проверяем сохраненные данные из sessionStorage (при возврате назад)
+    const savedUserData = sessionStorage.getItem('userData');
+    const savedSubscription = sessionStorage.getItem('subscription');
+    if (savedUserData) {
+        try {
+            const savedUser = JSON.parse(savedUserData);
+            const savedSub = savedSubscription ? JSON.parse(savedSubscription) : null;
+            
+            // Восстанавливаем данные из сохраненных
+            currentUser = savedUser;
+            userSubscription = savedSub;
+            
+            console.log('✅ Восстановлены данные из sessionStorage:', {
+                telegramId: `***${String(savedUser.telegramId).slice(-4)}`,
+                hasSubscription: !!savedSub
+            });
+            
+            // Обновляем UI сразу
+            updateUserUI(currentUser, userSubscription);
+            updateModeCardsAccess(userSubscription);
+            
+            // Загружаем свежие данные с сервера в фоне (для обновления статуса)
+            if (savedUser.telegramId) {
+                await loadFullUserDataFromServer(savedUser.telegramId);
+            }
+            return;
+        } catch (e) {
+            console.warn('⚠️ Ошибка восстановления данных из sessionStorage:', e);
+        }
+    }
     
     // ШАГ 0: Приоритет - URL параметры (бот передает tg_id)
     telegramId = getTelegramIdFromUrl();
@@ -422,13 +467,31 @@ function openLivePage() {
         return;
     }
     
+    // Сохраняем данные в sessionStorage перед переходом
+    if (currentUser && currentUser.telegramId) {
+        sessionStorage.setItem('telegramId', String(currentUser.telegramId));
+        sessionStorage.setItem('userData', JSON.stringify({
+            telegramId: currentUser.telegramId,
+            firstName: currentUser.firstName,
+            username: currentUser.username,
+            photoUrl: currentUser.photoUrl
+        }));
+    }
+    if (userSubscription) {
+        sessionStorage.setItem('subscription', JSON.stringify(userSubscription));
+    }
+    
     // Добавляем класс для плавного перехода
     document.body.style.transition = 'opacity 0.2s ease-out';
     document.body.style.opacity = '0.95';
     
+    // Передаем telegramId через URL
+    const telegramId = currentUser?.telegramId || userSubscription?.telegram_id;
+    const url = telegramId ? `live.html?tg_id=${telegramId}` : 'live.html';
+    
     // Небольшая задержка для плавности, затем переход
     setTimeout(() => {
-        window.location.href = 'live.html';
+        window.location.href = url;
     }, 50);
 }
 

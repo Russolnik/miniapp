@@ -442,17 +442,62 @@ async function getUserApiKey(): Promise<string | null> {
 // Проверка статуса подписки перед использованием Live (сначала localhost)
 async function checkSubscriptionStatus(): Promise<{is_active: boolean; is_trial?: boolean; days_left?: number; hours_left?: number} | null> {
   try {
-    // Используем getApiUrl() который уже проверяет localhost первым
-    const apiUrl = await getApiUrl();
-    const tg = window.Telegram?.WebApp;
-    const initData = tg?.initData || '';
+    // Сначала пробуем получить из sessionStorage (сохранено на main.html)
+    const savedSubscription = sessionStorage.getItem('subscription');
+    if (savedSubscription) {
+      try {
+        const sub = JSON.parse(savedSubscription);
+        console.log('✅ Используем сохраненную подписку из sessionStorage:', sub);
+        return sub;
+      } catch (e) {
+        console.warn('⚠️ Ошибка парсинга сохраненной подписки:', e);
+      }
+    }
     
-    if (!tg?.initDataUnsafe?.user?.id) {
+    // Пробуем получить telegramId из различных источников
+    let telegramId: number | null = null;
+    
+    // 1. Из URL параметров (передан с main.html)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTelegramId = urlParams.get('tg_id') || urlParams.get('telegram_id') || urlParams.get('user_id');
+    if (urlTelegramId) {
+      const parsedId = parseInt(urlTelegramId, 10);
+      if (!isNaN(parsedId) && parsedId > 100000000 && parsedId < 999999999999999) {
+        telegramId = parsedId;
+        console.log('✅ Telegram ID получен из URL:', `***${String(telegramId).slice(-4)}`);
+      }
+    }
+    
+    // 2. Из sessionStorage
+    if (!telegramId) {
+      const savedId = sessionStorage.getItem('telegramId');
+      if (savedId) {
+        const parsedId = parseInt(savedId, 10);
+        if (!isNaN(parsedId)) {
+          telegramId = parsedId;
+          console.log('✅ Telegram ID получен из sessionStorage:', `***${String(telegramId).slice(-4)}`);
+        }
+      }
+    }
+    
+    // 3. Из initDataUnsafe (последний способ)
+    if (!telegramId) {
+      const tg = window.Telegram?.WebApp;
+      if (tg?.initDataUnsafe?.user?.id) {
+        telegramId = tg.initDataUnsafe.user.id;
+        console.log('✅ Telegram ID получен из initDataUnsafe:', `***${String(telegramId).slice(-4)}`);
+      }
+    }
+    
+    if (!telegramId) {
       console.warn('⚠️ Не удалось получить ID пользователя для проверки подписки');
       return null;
     }
     
-    const telegramId = tg.initDataUnsafe.user.id;
+    // Используем getApiUrl() который уже проверяет localhost первым
+    const apiUrl = await getApiUrl();
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData || '';
     
     const response = await fetch(`${apiUrl}/api/user/status`, {
       method: 'POST',
