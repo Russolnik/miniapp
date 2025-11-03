@@ -104,8 +104,113 @@ async function getApiUrl() {
     return await apiUrlCheckPromise;
 }
 
+// Функция для загрузки полных данных пользователя с подпиской
+async function loadFullUserDataFromServer(telegramId) {
+    if (!telegramId) return;
+    
+    try {
+        const apiUrl = await getApiUrl();
+        const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                telegram_id: telegramId
+            }),
+        });
+        
+        if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            
+            // Обновляем данные пользователя
+            if (statusData.user) {
+                currentUser = {
+                    telegramId: statusData.user.telegram_id || telegramId,
+                    firstName: statusData.user.first_name || 'Пользователь',
+                    username: statusData.user.username || null,
+                    photoUrl: statusData.user.photo_url || null
+                };
+            }
+            
+            // Обновляем статус подписки
+            if (statusData.subscription) {
+                userSubscription = statusData.subscription;
+            }
+            
+            // Обновляем UI
+            updateUserUI(currentUser, userSubscription);
+            updateModeCardsAccess(userSubscription);
+            
+            console.log('✅ Полные данные пользователя загружены:', {
+                telegramId: `***${String(telegramId).slice(-4)}`,
+                hasSubscription: !!userSubscription
+            });
+        }
+    } catch (e) {
+        console.error('❌ Ошибка загрузки полных данных:', e);
+    }
+}
+
 // Загрузка данных пользователя с сервера (переработанная версия)
 async function loadUserDataFromServer() {
+    // ШАГ 0: Сначала проверяем URL параметры (самый надежный способ если бот передает tg_id)
+    let telegramId = null;
+    let telegramUser = null;
+    
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTelegramId = urlParams.get('tg_id') || urlParams.get('telegram_id') || urlParams.get('user_id');
+        if (urlTelegramId) {
+            const parsedId = parseInt(urlTelegramId, 10);
+            if (!isNaN(parsedId) && parsedId > 100000000 && parsedId < 999999999999999) {
+                telegramId = parsedId;
+                console.log('✅ Telegram ID получен из URL параметров (приоритет):', `***${String(telegramId).slice(-4)}`);
+                
+                // Сразу загружаем данные с сервера
+                try {
+                    const apiUrl = await getApiUrl();
+                    const statusResponse = await fetch(`${apiUrl}/api/user/status?telegram_id=${telegramId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+                        if (statusData.user) {
+                            telegramUser = {
+                                id: telegramId,
+                                first_name: statusData.user.first_name || 'Пользователь',
+                                username: statusData.user.username || null,
+                                photo_url: statusData.user.photo_url || null
+                            };
+                            console.log('✅ Данные пользователя получены через GET запрос:', `***${String(telegramId).slice(-4)}`);
+                            
+                            // Обновляем UI сразу
+                            currentUser = {
+                                telegramId: telegramId,
+                                firstName: telegramUser.first_name || 'Пользователь',
+                                username: telegramUser.username || null,
+                                photoUrl: telegramUser.photo_url || null
+                            };
+                            updateUserUI(currentUser, null);
+                            
+                            // Загружаем полные данные с подпиской
+                            await loadFullUserDataFromServer(telegramId);
+                            return; // Выходим, данные уже получены
+                        }
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Ошибка получения данных через GET запрос:', e);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Ошибка получения ID из URL:', e);
+    }
+    
     // ШАГ 1: Инициализируем Telegram WebApp и ждем его загрузки
     const webApp = await initTelegramWebApp();
     
@@ -245,16 +350,44 @@ async function loadUserDataFromServer() {
         }
     }
     
-    // Способ 4: Пробуем получить telegram_id из URL параметров
+    // Способ 4: Пробуем получить telegram_id из URL параметров (приоритетный способ если initData пустой)
+    // Это работает когда бот открывает miniapp с параметром tg_id
     if (!telegramId) {
         try {
             const urlParams = new URLSearchParams(window.location.search);
             const urlTelegramId = urlParams.get('tg_id') || urlParams.get('telegram_id') || urlParams.get('user_id');
             if (urlTelegramId) {
                 const parsedId = parseInt(urlTelegramId, 10);
-                if (!isNaN(parsedId) && parsedId > 100000000) {
+                if (!isNaN(parsedId) && parsedId > 100000000 && parsedId < 999999999999999) {
                     telegramId = parsedId;
                     console.log('✅ Telegram ID получен из URL параметров:', `***${String(telegramId).slice(-4)}`);
+                    
+                    // Если получили ID из URL, сразу делаем запрос к серверу для получения данных пользователя
+                    // Это позволит обойти проблему с пустым initData
+                    try {
+                        const apiUrl = await getApiUrl();
+                        const statusResponse = await fetch(`${apiUrl}/api/user/status?telegram_id=${telegramId}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                        });
+                        
+                        if (statusResponse.ok) {
+                            const statusData = await statusResponse.json();
+                            if (statusData.user) {
+                                telegramUser = {
+                                    id: telegramId,
+                                    first_name: statusData.user.first_name || 'Пользователь',
+                                    username: statusData.user.username || null,
+                                    photo_url: statusData.user.photo_url || null
+                                };
+                                console.log('✅ Данные пользователя получены через GET запрос с telegram_id:', `***${String(telegramId).slice(-4)}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Ошибка получения данных через GET запрос:', e);
+                    }
                 }
             }
         } catch (e) {
