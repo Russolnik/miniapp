@@ -10,6 +10,12 @@
   to = "/main.html"
   status = 301
 
+# Редирект admin на admin.html (если запрашивается /admin)
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 301
+
 [build]
   command = "npm install && npm run build"
   publish = "dist"

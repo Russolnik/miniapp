@@ -225,6 +225,24 @@
             </div>
             
             <div class="section">
+                <h2>👥 Пользователи</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="admin-search-user" placeholder="Поиск по ID или username" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <button class="btn btn-primary" onclick="adminSearchUser()">Найти</button>
+                    </div>
+                    <button class="btn" onclick="adminLoadUsersList()" style="background: #42a5f5;">Загрузить всех пользователей</button>
+                    <div id="admin-users-list" style="display: none; margin-top: 15px; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+                        <div id="admin-users-list-content"></div>
+                    </div>
+                    <div id="admin-user-info" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f5f5f5;">
+                        <h3 id="admin-user-info-title">Информация о пользователе</h3>
+                        <div id="admin-user-info-content"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
                 <h2>💎 Управление подписками</h2>
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                     <div style="display: flex; gap: 10px; align-items: center;">
@@ -378,6 +396,182 @@
                 console.error('Ошибка загрузки статистики:', error);
             }
         }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('admin-subscription-result');
+            if (!resultDiv) return;
+            resultDiv.textContent = message;
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = type === 'success' ? '#e8f5e9' : '#ffebee';
+            resultDiv.style.color = type === 'success' ? '#2e7d32' : '#c62828';
+            
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        async function adminLoadUsersList() {
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            const listDiv = document.getElementById('admin-users-list');
+            const contentDiv = document.getElementById('admin-users-list-content');
+            listDiv.style.display = 'block';
+            contentDiv.innerHTML = '<p>Загрузка...</p>';
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/users/list`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: password, limit: 1000, offset: 0 })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const users = data.users || [];
+                    
+                    if (users.length === 0) {
+                        contentDiv.innerHTML = '<p>Пользователи не найдены</p>';
+                        return;
+                    }
+                    
+                    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
+                    html += '<thead><tr style="background: #f0f0f0;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Username</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Имя</th><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Действие</th></tr></thead><tbody>';
+                    
+                    users.forEach(user => {
+                        html += `<tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${user.telegram_id}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${user.username || '—'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${user.first_name || '—'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">
+                                <button class="btn btn-primary" onclick="adminShowUserInfo('${user.telegram_id}')" style="padding: 5px 10px; font-size: 12px;">Подробнее</button>
+                            </td>
+                        </tr>`;
+                    });
+                    
+                    html += '</tbody></table>';
+                    contentDiv.innerHTML = html;
+                } else {
+                    contentDiv.innerHTML = '<p style="color: red;">Ошибка загрузки списка пользователей</p>';
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+            }
+        }
+        
+        async function adminSearchUser() {
+            const searchTerm = document.getElementById('admin-search-user').value.trim();
+            if (!searchTerm) {
+                showResult('Введите ID или username для поиска', 'error');
+                return;
+            }
+            
+            await adminShowUserInfo(searchTerm);
+        }
+        
+        async function adminShowUserInfo(searchTerm) {
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            const infoDiv = document.getElementById('admin-user-info');
+            const titleDiv = document.getElementById('admin-user-info-title');
+            const contentDiv = document.getElementById('admin-user-info-content');
+            
+            infoDiv.style.display = 'block';
+            contentDiv.innerHTML = '<p>Загрузка...</p>';
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/users/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        search_term: searchTerm.toString()
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (!data.found || !data.user) {
+                        contentDiv.innerHTML = '<p style="color: red;">Пользователь не найден</p>';
+                        return;
+                    }
+                    
+                    const user = data.user;
+                    
+                    // Обновляем поле ID для управления подпиской
+                    document.getElementById('admin-user-id').value = user.telegram_id;
+                    
+                    let html = `<div style="display: flex; flex-direction: column; gap: 10px;">`;
+                    html += `<div><strong>ID:</strong> ${user.telegram_id}</div>`;
+                    html += `<div><strong>Username:</strong> ${user.username || '—'}</div>`;
+                    html += `<div><strong>Имя:</strong> ${user.first_name || '—'}</div>`;
+                    
+                    // Информация о пробном периоде
+                    const trial = user.trial_status || {};
+                    html += `<div style="margin-top: 10px;"><strong>Пробный период:</strong> `;
+                    if (trial.is_active) {
+                        html += `✅ Активен (осталось: ${trial.hours_remaining ? trial.hours_remaining.toFixed(1) : 0} ч.)`;
+                    } else if (trial.trial_used) {
+                        html += `❌ Использован`;
+                    } else {
+                        html += `🆕 Доступен`;
+                    }
+                    html += `</div>`;
+                    
+                    // Информация о подписке
+                    const subscription = user.active_subscription;
+                    if (subscription) {
+                        html += `<div style="margin-top: 10px; padding: 10px; background: white; border-radius: 8px;">`;
+                        html += `<strong>💎 Активная подписка:</strong><br>`;
+                        html += `Тип: ${subscription.type}<br>`;
+                        html += `Осталось: ${subscription.days_left} дн. (${subscription.hours_left.toFixed(1)} ч.)<br>`;
+                        html += `Действует до: ${new Date(subscription.end_date).toLocaleString('ru-RU')}<br>`;
+                        html += `Оплата: ${subscription.is_stars_payment ? 'Stars ⭐' : 'Ручная'}<br>`;
+                        html += `</div>`;
+                        
+                        // Кнопки управления подпиской
+                        html += `<div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">`;
+                        if (subscription.is_active) {
+                            html += `<button class="btn" onclick="adminPauseSubscription()" style="flex: 1; background: #ffa726; min-width: 120px;">Пауза</button>`;
+                            html += `<button class="btn" onclick="adminStopSubscription()" style="flex: 1; background: #ef5350; min-width: 120px;">Остановить</button>`;
+                        } else {
+                            html += `<button class="btn" onclick="adminResumeSubscription()" style="flex: 1; background: #66bb6a; min-width: 120px;">Возобновить</button>`;
+                        }
+                        html += `</div>`;
+                    } else {
+                        html += `<div style="margin-top: 10px;"><strong>Подписка:</strong> ❌ Не активна</div>`;
+                    }
+                    
+                    html += `</div>`;
+                    
+                    contentDiv.innerHTML = html;
+                    titleDiv.textContent = `Пользователь: ${user.first_name || user.telegram_id}`;
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
+                    contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.error || 'Неизвестная ошибка'}</p>`;
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `<p style="color: red;">Ошибка: ${error.message}</p>`;
+            }
+        }
+        
+        // Поддержка Enter для поиска
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('admin-search-user');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        adminSearchUser();
+                    }
+                });
+            }
+        });
         
         // Инициализация Telegram WebApp
         if (window.Telegram && window.Telegram.WebApp) {
