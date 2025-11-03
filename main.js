@@ -1,7 +1,40 @@
 // Инициализация Telegram WebApp
-const tg = window.Telegram?.WebApp;
+let tg = null;
 let currentUser = null;
 let userSubscription = null;
+
+// Функция для инициализации Telegram WebApp с ожиданием загрузки
+function initTelegramWebApp() {
+    return new Promise((resolve) => {
+        // Проверяем, доступен ли уже Telegram.WebApp
+        if (window.Telegram?.WebApp) {
+            tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            resolve(tg);
+            return;
+        }
+        
+        // Ждем загрузки Telegram WebApp SDK
+        let attempts = 0;
+        const maxAttempts = 50; // 5 секунд максимум
+        
+        const checkInterval = setInterval(() => {
+            attempts++;
+            if (window.Telegram?.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+                clearInterval(checkInterval);
+                resolve(tg);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                console.warn('⚠️ Telegram WebApp не загружен после ожидания');
+                resolve(null);
+            }
+        }, 100);
+    });
+}
 
 // Кэш для проверенного API URL (чтобы не проверять каждый раз)
 let cachedApiUrl = null;
@@ -71,65 +104,13 @@ async function getApiUrl() {
     return await apiUrlCheckPromise;
 }
 
-// Загрузка данных пользователя с сервера (упрощенная версия)
+// Загрузка данных пользователя с сервера (переработанная версия)
 async function loadUserDataFromServer() {
-    // ШАГ 1: Получаем данные пользователя из Telegram WebApp initDataUnsafe (для UI)
-    const webApp = window.Telegram?.WebApp || tg;
-    let telegramId = null;
-    let telegramUser = null;
+    // ШАГ 1: Инициализируем Telegram WebApp и ждем его загрузки
+    const webApp = await initTelegramWebApp();
     
-    // Получаем данные из initDataUnsafe (рекомендуемый способ согласно документации Telegram)
-    if (webApp?.initDataUnsafe?.user) {
-        telegramUser = webApp.initDataUnsafe.user;
-        telegramId = telegramUser.id;
-        
-        // Сразу показываем данные из Telegram для быстрого отображения
-        if (telegramUser) {
-            currentUser = {
-                telegramId: telegramId,
-                firstName: telegramUser.first_name || 'Пользователь',
-                username: telegramUser.username || null,
-                photoUrl: telegramUser.photo_url || null
-            };
-            // Обновляем UI сразу с данными из Telegram
-            updateUserUI(currentUser, null);
-            console.log('✅ Данные пользователя получены из initDataUnsafe:', {
-                id: `***${String(telegramId).slice(-4)}`,
-                firstName: currentUser.firstName,
-                username: currentUser.username ? `@${currentUser.username}` : 'не указан'
-            });
-        }
-    } else if (webApp?.initData) {
-        // Fallback: парсим initData вручную
-        try {
-            const urlParams = new URLSearchParams(webApp.initData);
-            const userStr = urlParams.get('user');
-            if (userStr) {
-                telegramUser = JSON.parse(decodeURIComponent(userStr));
-                telegramId = telegramUser.id;
-                
-                if (telegramUser) {
-                    currentUser = {
-                        telegramId: telegramId,
-                        firstName: telegramUser.first_name || 'Пользователь',
-                        username: telegramUser.username || null,
-                        photoUrl: telegramUser.photo_url || null
-                    };
-                    updateUserUI(currentUser, null);
-                    console.log('✅ Данные пользователя получены из initData:', {
-                        id: `***${String(telegramId).slice(-4)}`,
-                        firstName: currentUser.firstName
-                    });
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ Не удалось распарсить initData:', e);
-        }
-    }
-    
-    // Если не удалось получить данные, показываем заглушку
-    if (!telegramId || !telegramUser) {
-        console.error('❌ Данные пользователя Telegram не найдены. Показываем заглушку.');
+    if (!webApp) {
+        console.error('❌ Telegram WebApp не доступен');
         currentUser = {
             telegramId: null,
             firstName: 'Пользователь',
@@ -139,6 +120,87 @@ async function loadUserDataFromServer() {
         updateUserUI(currentUser, null);
         return;
     }
+    
+    let telegramId = null;
+    let telegramUser = null;
+    
+    // Способ 1: Получаем данные из initDataUnsafe (рекомендуемый способ)
+    if (webApp.initDataUnsafe?.user) {
+        telegramUser = webApp.initDataUnsafe.user;
+        telegramId = telegramUser.id;
+        console.log('✅ Telegram ID получен из initDataUnsafe.user.id:', `***${String(telegramId).slice(-4)}`);
+    }
+    
+    // Способ 2: Если initDataUnsafe не сработал, парсим initData напрямую
+    if (!telegramId && webApp.initData) {
+        try {
+            console.log('🔍 Пробуем парсить initData напрямую...');
+            
+            // Парсим initData (формат: user=...&auth_date=...&hash=...)
+            const params = new URLSearchParams(webApp.initData);
+            const userParam = params.get('user');
+            
+            if (userParam) {
+                // Декодируем и парсим JSON
+                const userJson = decodeURIComponent(userParam);
+                telegramUser = JSON.parse(userJson);
+                telegramId = telegramUser.id;
+                console.log('✅ Telegram ID получен из initData парсинга:', `***${String(telegramId).slice(-4)}`);
+            } else {
+                console.warn('⚠️ Параметр "user" не найден в initData');
+            }
+        } catch (e) {
+            console.error('❌ Ошибка парсинга initData:', e);
+        }
+    }
+    
+    // Способ 3: Альтернативный парсинг initData (если стандартный не сработал)
+    if (!telegramId && webApp.initData) {
+        try {
+            // Пробуем найти user= в строке напрямую
+            const userMatch = webApp.initData.match(/user=([^&]+)/);
+            if (userMatch && userMatch[1]) {
+                const userJson = decodeURIComponent(userMatch[1]);
+                telegramUser = JSON.parse(userJson);
+                telegramId = telegramUser.id;
+                console.log('✅ Telegram ID получен из альтернативного парсинга:', `***${String(telegramId).slice(-4)}`);
+            }
+        } catch (e) {
+            console.error('❌ Ошибка альтернативного парсинга:', e);
+        }
+    }
+    
+    // Если не удалось получить данные, показываем заглушку
+    if (!telegramId || !telegramUser) {
+        console.error('❌ Не удалось получить Telegram ID. Доступные данные:', {
+            hasWebApp: !!webApp,
+            hasInitDataUnsafe: !!webApp?.initDataUnsafe,
+            hasInitData: !!webApp?.initData,
+            initDataLength: webApp?.initData?.length || 0
+        });
+        currentUser = {
+            telegramId: null,
+            firstName: 'Пользователь',
+            username: null,
+            photoUrl: null
+        };
+        updateUserUI(currentUser, null);
+        return;
+    }
+    
+    // Сразу показываем данные из Telegram для быстрого отображения
+    currentUser = {
+        telegramId: telegramId,
+        firstName: telegramUser.first_name || 'Пользователь',
+        username: telegramUser.username || null,
+        photoUrl: telegramUser.photo_url || null
+    };
+    updateUserUI(currentUser, null);
+    console.log('✅ Данные пользователя из Telegram:', {
+        id: `***${String(telegramId).slice(-4)}`,
+        firstName: currentUser.firstName,
+        username: currentUser.username ? `@${currentUser.username}` : 'не указан'
+    });
 
     // ШАГ 2: Загружаем данные пользователя и статус подписки с сервера по telegram_id
     const apiUrl = await getApiUrl();
