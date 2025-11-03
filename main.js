@@ -370,7 +370,35 @@ function updateUserUI(user, subscription) {
         const photoUrl = user?.photoUrl || user?.photo_url;
         if (photoUrl) {
             console.log('🖼️ Загрузка аватара:', photoUrl);
-            userAvatarEl.innerHTML = `<img src="${photoUrl}" alt="Аватар пользователя" class="user-avatar-img" onerror="console.error('❌ Ошибка загрузки аватара'); this.parentElement.innerHTML='${user?.firstName?.[0]?.toUpperCase() || user?.first_name?.[0]?.toUpperCase() || '👤'}'; this.parentElement.classList.remove('has-photo');" />`;
+            
+            // Безопасная обработка ошибок загрузки изображения
+            const initial = user?.firstName?.[0]?.toUpperCase() || user?.first_name?.[0]?.toUpperCase() || '👤';
+            const img = document.createElement('img');
+            img.src = photoUrl;
+            img.alt = 'Аватар пользователя';
+            img.className = 'user-avatar-img';
+            img.onerror = function() {
+                console.error('❌ Ошибка загрузки аватара:', photoUrl);
+                // Безопасная обработка ошибки
+                const parent = this.parentElement;
+                if (parent) {
+                    parent.innerHTML = initial;
+                    parent.classList.remove('has-photo');
+                } else {
+                    // Если parentElement недоступен, ищем элемент по ID
+                    const avatarEl = document.getElementById('user-avatar');
+                    if (avatarEl) {
+                        avatarEl.innerHTML = initial;
+                        avatarEl.classList.remove('has-photo');
+                    }
+                }
+            };
+            img.onload = function() {
+                console.log('✅ Аватар успешно загружен');
+            };
+            
+            userAvatarEl.innerHTML = '';
+            userAvatarEl.appendChild(img);
             userAvatarEl.classList.add('has-photo');
         } else {
             // Иначе показываем первую букву имени или эмодзи
