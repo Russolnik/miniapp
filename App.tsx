@@ -60,8 +60,15 @@ let apiUrlCheckPromise: Promise<string> | null = null;
 // Проверка доступности сервера
 async function checkServerAvailable(url: string): Promise<boolean> {
   try {
+    // Не проверяем localhost если мы на продакшн домене (HTTPS)
+    // Это вызывает CORS ошибку "unknown address space"
+    if (window.location.protocol === 'https:' && url.startsWith('http://localhost')) {
+      console.log('⚠️ Пропускаем проверку localhost на HTTPS сайте (CORS ограничение браузера)');
+      return false;
+    }
+    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 секунды
     
     const response = await fetch(`${url}/health`, {
       method: 'GET',
@@ -70,7 +77,11 @@ async function checkServerAvailable(url: string): Promise<boolean> {
     
     clearTimeout(timeoutId);
     return response.ok;
-  } catch (error) {
+  } catch (error: any) {
+    // CORS ошибка для localhost - это нормально на HTTPS сайте
+    if (url.startsWith('http://localhost') && (error.name === 'TypeError' || error.message?.includes('CORS'))) {
+      console.log('⚠️ CORS ошибка для localhost (это нормально на HTTPS сайте)');
+    }
     return false;
   }
 }
@@ -97,18 +108,23 @@ async function getApiUrl(): Promise<string> {
     console.log('🌐 Определение API сервера (сначала проверяем localhost)...');
     
     // ВСЕГДА сначала проверяем локальный сервер (для удобства разработки)
-    console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
-    try {
-      const localAvailable = await checkServerAvailable(localUrl);
-      if (localAvailable) {
-        console.log('✅ Локальный сервер доступен, используем его для разработки');
-        cachedApiUrl = localUrl;
-        return localUrl;
-      } else {
-        console.log('⚠️ Локальный сервер недоступен');
+    // Но только если мы не на HTTPS сайте (CORS ограничение браузера)
+    if (window.location.protocol === 'http:' || window.location.hostname === 'localhost') {
+      console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
+      try {
+        const localAvailable = await checkServerAvailable(localUrl);
+        if (localAvailable) {
+          console.log('✅ Локальный сервер доступен, используем его для разработки');
+          cachedApiUrl = localUrl;
+          return localUrl;
+        } else {
+          console.log('⚠️ Локальный сервер недоступен');
+        }
+      } catch (e: any) {
+        console.log('⚠️ Ошибка проверки локального сервера:', e?.message || e);
       }
-    } catch (e: any) {
-      console.log('⚠️ Ошибка проверки локального сервера:', e?.message || e);
+    } else {
+      console.log('ℹ️ Пропуск проверки localhost (на HTTPS сайте это вызывает CORS ошибку)');
     }
     
     // Если локальный сервер недоступен, используем production
@@ -121,58 +137,7 @@ async function getApiUrl(): Promise<string> {
   return await apiUrlCheckPromise;
 }
 
-// Получение API ключа из переменных окружения (fallback)
-function getApiKeyFromEnv(): string | null {
-  try {
-    // Логирование замаскировано
-    // console.log('🔍 Поиск API ключа в env переменных...');
-    // console.log('🔍 window.ENV:', typeof window !== 'undefined' ? (window as any).ENV : 'недоступен');
-    
-    // Способ 1: Пробуем получить из window.ENV (встроенный через HTML скрипт)
-    if (typeof window !== 'undefined' && (window as any).ENV?.GEMINI_API_KEY) {
-      const envKey = (window as any).ENV.GEMINI_API_KEY;
-      const maskedKey = `***${envKey.slice(-4)}`;
-      console.log(`✅ API ключ получен из window.ENV: ${maskedKey}`);
-      return envKey;
-    }
-    
-    // Способ 2: Пробуем получить из import.meta.env (для Vite во время сборки)
-    try {
-      const viteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-      if (viteKey && viteKey.trim() !== '') {
-        const maskedKey = `***${viteKey.slice(-4)}`;
-        console.log(`✅ API ключ получен из import.meta.env: ${maskedKey}`);
-        return viteKey;
-      } else {
-        console.log('⚠️ import.meta.env.VITE_GEMINI_API_KEY пуст или не определен');
-      }
-    } catch (e) {
-      console.log('⚠️ import.meta.env не доступен:', e);
-    }
-    
-    // Способ 3: Пробуем получить из глобальной переменной (для Netlify через функции)
-    if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
-      const globalKey = (window as any).GEMINI_API_KEY;
-      const maskedKey = `***${globalKey.slice(-4)}`;
-      console.log(`✅ API ключ получен из глобальной переменной: ${maskedKey}`);
-      return globalKey;
-    }
-    
-    // Способ 4: Fallback - явный ключ для тестирования (временный)
-    const fallbackKey = 'AIzaSyBscpJYM-ZPFmvihUrbnaupQhEOjAAlyjo';
-    const maskedFallback = `***${fallbackKey.slice(-4)}`;
-    console.log(`⚠️ Использую fallback API ключ (явно указанный в коде): ${maskedFallback}`);
-    return fallbackKey;
-    
-  } catch (e) {
-    console.error('❌ Ошибка получения API ключа из env:', e);
-    // В случае ошибки тоже возвращаем fallback ключ
-    const fallbackKey = 'AIzaSyBscpJYM-ZPFmvihUrbnaupQhEOjAAlyjo';
-    const maskedFallback = `***${fallbackKey.slice(-4)}`;
-    console.log(`⚠️ Использую fallback API ключ из catch блока: ${maskedFallback}`);
-    return fallbackKey;
-  }
-}
+// Функция getApiKeyFromEnv удалена - ключи теперь берутся только с сервера для безопасности
 
 // Получение API ключа пользователя
 async function getUserApiKey(): Promise<string | null> {
@@ -241,10 +206,10 @@ async function getUserApiKey(): Promise<string | null> {
         }
       }
     }
-    // Способ 3: Проверка URL параметров (для отладки или альтернативных запусков)
+    // Способ 3: Проверка URL параметров (tg_id из bot.py при открытии miniapp)
     else {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlUserId = urlParams.get('tg_user_id') || urlParams.get('user_id');
+      const urlUserId = urlParams.get('tg_id') || urlParams.get('tg_user_id') || urlParams.get('user_id');
       if (urlUserId) {
         const parsedId = parseInt(urlUserId, 10);
         if (!isNaN(parsedId)) {
@@ -290,17 +255,8 @@ async function getUserApiKey(): Promise<string | null> {
         }
       }
       
-      // Если не удалось получить telegram_id, пробуем взять ключ из env переменных (fallback)
-      // Логирование замаскировано
-      // console.log('⚠️ Telegram ID не найден, пробуем получить API ключ из env переменных...');
-      const envApiKey = getApiKeyFromEnv();
-      if (envApiKey) {
-        const maskedKey = `***${envApiKey.slice(-4)}`;
-        console.log(`✅ API ключ получен из env (fallback): ${maskedKey}`);
-        return envApiKey;
-      }
-      
-      console.error('❌ Не удалось получить API ключ ни с сервера, ни из env переменных');
+      // Ключ должен браться только с сервера, без fallback на env
+      console.error('❌ Не удалось получить API ключ: требуется Telegram ID для запроса с сервера');
       return null;
     }
     
@@ -372,15 +328,8 @@ async function getUserApiKey(): Promise<string | null> {
         console.error('❌ Не удалось прочитать ответ сервера:', readError);
       }
       
-      // Fallback: пробуем получить ключ из env переменных
-      console.log('⚠️ Пробуем получить API ключ из env переменных (fallback)...');
-      const envApiKey = getApiKeyFromEnv();
-      if (envApiKey) {
-        const maskedKey = `***${envApiKey.slice(-4)}`;
-        console.log(`✅ API ключ получен из env (fallback): ${maskedKey}`);
-        return envApiKey;
-      }
-      
+      // Ключ должен браться только с сервера, без fallback на env
+      console.error('❌ Не удалось получить API ключ с сервера');
       return null;
     }
     
@@ -413,28 +362,17 @@ async function getUserApiKey(): Promise<string | null> {
       return null;
     }
     
-    // Маскируем API ключ в логах (показываем только последние 4 символа)
+    // Маскируем API ключ в логах (показываем только последние 4 символа, как в bot.py)
     const maskedApiKey = `***${data.api_key.slice(-4)}`;
-    const keyNumber = data.success ? 'получен' : 'не получен';
-    console.log(`✅ API ключ ${keyNumber} с сервера: ${maskedApiKey}`);
+    console.log(`✅ API ключ получен с сервера: ${maskedApiKey}`);
     
     return data.api_key;
   } catch (error) {
-    console.error('❌ Ошибка запроса API ключа с сервера, пробуем env переменные...');
-    
-    // Fallback: пробуем получить ключ из env переменных
-    const envApiKey = getApiKeyFromEnv();
-    if (envApiKey) {
-      const maskedKey = `***${envApiKey.slice(-4)}`;
-      console.log(`✅ API ключ получен из env (fallback): ${maskedKey}`);
-      return envApiKey;
-    }
-    
-    console.error('❌ Не удалось получить API ключ ни с сервера, ни из env переменных');
+    console.error('❌ Ошибка запроса API ключа с сервера');
     console.error('💡 Убедитесь, что:');
     console.error('   1. Приложение открыто через Telegram (для получения Telegram ID)');
     console.error('   2. Сервер доступен (для получения ключа с сервера)');
-    console.error('   3. В Netlify настроена переменная VITE_GEMINI_API_KEY (для fallback)');
+    console.error('   3. У вас есть активная подписка (ключ назначается при активации бота)');
     return null;
   }
 }
