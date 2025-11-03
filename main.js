@@ -141,8 +141,32 @@ async function loadUserDataFromServer() {
     if (webApp.initDataUnsafe?.user) {
         telegramUser = webApp.initDataUnsafe.user;
         
-        // Проверяем разные варианты получения ID
-        telegramId = telegramUser.id || telegramUser.user_id || telegramUser.userId;
+        // Детальное логирование структуры user
+        console.log('🔍 Детальная структура initDataUnsafe.user:', {
+            keys: Object.keys(telegramUser),
+            values: Object.entries(telegramUser).reduce((acc, [key, val]) => {
+                // Маскируем длинные значения
+                if (typeof val === 'string' && val.length > 20) {
+                    acc[key] = `${val.substring(0, 20)}...`;
+                } else {
+                    acc[key] = val;
+                }
+                return acc;
+            }, {})
+        });
+        
+        // Проверяем разные варианты получения ID (стандартное поле Telegram - id)
+        telegramId = telegramUser.id;
+        
+        // Если id отсутствует, пробуем альтернативные варианты
+        if (!telegramId && telegramUser.user_id) {
+            telegramId = telegramUser.user_id;
+            console.log('⚠️ Используем альтернативное поле user_id');
+        }
+        if (!telegramId && telegramUser.userId) {
+            telegramId = telegramUser.userId;
+            console.log('⚠️ Используем альтернативное поле userId');
+        }
         
         // Если ID в виде строки, пробуем преобразовать в число
         if (telegramId && typeof telegramId === 'string') {
@@ -158,12 +182,15 @@ async function loadUserDataFromServer() {
             console.log('✅ Telegram ID получен из initDataUnsafe.user.id:', `***${String(telegramId).slice(-4)}`);
         } else {
             console.warn('⚠️ initDataUnsafe.user.id не является валидным ID');
-            console.warn('🔍 Полная структура user:', JSON.stringify(telegramUser, null, 2));
-            // Пробуем найти ID в других полях
+            console.warn('🔍 Полная структура user (для отладки):', JSON.stringify(telegramUser, null, 2));
+            
+            // Последняя попытка - ищем любое числовое значение, похожее на ID
             for (const key in telegramUser) {
-                if (key.toLowerCase().includes('id') && telegramUser[key]) {
-                    const potentialId = parseInt(telegramUser[key], 10);
-                    if (!isNaN(potentialId) && potentialId > 0) {
+                const value = telegramUser[key];
+                if (value && (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(String(value))))) {
+                    const potentialId = parseInt(value, 10);
+                    // Telegram ID обычно больше 100000000 (9 цифр)
+                    if (!isNaN(potentialId) && potentialId > 100000000 && potentialId < 999999999999999) {
                         telegramId = potentialId;
                         console.log(`✅ Telegram ID найден в поле ${key}:`, `***${String(telegramId).slice(-4)}`);
                         break;
@@ -173,6 +200,10 @@ async function loadUserDataFromServer() {
         }
     } else {
         console.warn('⚠️ initDataUnsafe.user недоступен');
+        console.warn('🔍 initDataUnsafe структура:', {
+            hasInitDataUnsafe: !!webApp.initDataUnsafe,
+            keys: webApp.initDataUnsafe ? Object.keys(webApp.initDataUnsafe) : []
+        });
     }
     
     // Способ 2: Если initDataUnsafe не сработал, парсим initData напрямую
