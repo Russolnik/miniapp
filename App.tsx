@@ -439,9 +439,10 @@ async function getUserApiKey(): Promise<string | null> {
   }
 }
 
-// Проверка статуса подписки перед использованием Live
-async function checkSubscriptionStatus(): Promise<{is_active: boolean} | null> {
+// Проверка статуса подписки перед использованием Live (сначала localhost)
+async function checkSubscriptionStatus(): Promise<{is_active: boolean; is_trial?: boolean} | null> {
   try {
+    // Используем getApiUrl() который уже проверяет localhost первым
     const apiUrl = await getApiUrl();
     const tg = window.Telegram?.WebApp;
     const initData = tg?.initData || '';
@@ -577,13 +578,13 @@ const App: React.FC = () => {
   }, [cleanup]);
 
   const handleStartConversation = useCallback(async () => {
-    // Проверяем подписку перед началом разговора
+    // Проверяем подписку или пробный период перед началом разговора
     if (!subscriptionChecked) {
       const status = await checkSubscriptionStatus();
       setSubscriptionStatus(status);
       setSubscriptionChecked(true);
       
-      if (!status || !status.is_active) {
+      if (!status || (!status.is_active && !status.is_trial)) {
         const message = '🚫 **Доступ ограничен**\n\n' +
           'Для использования Live общения требуется активная подписка.\n\n' +
           'Используйте команду /subscription в боте для оформления подписки.';
@@ -595,7 +596,7 @@ const App: React.FC = () => {
         }
         return;
       }
-    } else if (!subscriptionStatus || !subscriptionStatus.is_active) {
+    } else if (!subscriptionStatus || (!subscriptionStatus.is_active && !subscriptionStatus.is_trial)) {
       const message = '🚫 **Доступ ограничен**\n\n' +
         'Для использования Live общения требуется активная подписка.\n\n' +
         'Используйте команду /subscription в боте для оформления подписки.';
@@ -634,7 +635,7 @@ const App: React.FC = () => {
       // Пока используем оригинальный SDK - трафик идет напрямую от клиента
       // Для работы нужен VPN или прокси на уровне сети
       console.log('⚠️ ВНИМАНИЕ: Соединение идет напрямую к Google API от клиента');
-      console.log('⚠️ Для работы в РФ/Беларуси без VPN нужен прокси на уровне сети');
+      console.log('⚠️ Для работы нужен VPN');
       
       const ai = new GoogleGenAI({ apiKey });
       

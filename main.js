@@ -433,6 +433,20 @@ function showAboutPage() {
     window.location.href = 'about.html';
 }
 
+// Открыть страницу покупки подписки (через бота)
+function openSubscriptionPage() {
+    if (window.Telegram?.WebApp) {
+        // Открываем бота с командой /subscription
+        window.Telegram.WebApp.openTelegramLink('https://t.me/YOUR_BOT_USERNAME?start=subscription');
+    } else {
+        // Fallback: показываем сообщение
+        alert('Откройте бота и используйте команду /subscription для оформления подписки');
+    }
+}
+
+// Делаем функцию глобальной
+window.openSubscriptionPage = openSubscriptionPage;
+
 // Делаем функции глобальными для доступа из HTML
 window.openLivePage = openLivePage;
 window.openGenerationPage = openGenerationPage;
