@@ -2,7 +2,59 @@
  * Утилиты для получения данных пользователя
  */
 
-import { getApiUrlWithLocalhostCheck } from './apiUtils.js';
+import { getApiUrlWithLocalhostCheck, getApiUrl } from './apiUtils.js';
+
+/**
+ * Получение URL аватара пользователя
+ * Если photo_url - это путь сервера, преобразуем в полный URL
+ * @param {string | null} photoUrl - photo_url из ответа сервера
+ * @param {number} telegramId - Telegram ID пользователя
+ * @returns {Promise<string | null>}
+ */
+export async function getAvatarUrl(photoUrl, telegramId) {
+    if (!photoUrl && telegramId) {
+        // Если photo_url нет, но есть telegram_id, пробуем получить через endpoint
+        try {
+            const apiUrl = await getApiUrl();
+            return `${apiUrl}/api/avatar/${telegramId}`;
+        } catch (e) {
+            console.warn('⚠️ Ошибка получения URL аватара:', e);
+            return null;
+        }
+    }
+    
+    if (!photoUrl) {
+        return null;
+    }
+    
+    // Если это путь сервера (/api/avatar/...), преобразуем в полный URL
+    if (photoUrl.startsWith('/api/avatar/')) {
+        try {
+            const apiUrl = await getApiUrl();
+            return `${apiUrl}${photoUrl}`;
+        } catch (e) {
+            console.warn('⚠️ Ошибка преобразования пути аватара:', e);
+            return photoUrl;
+        }
+    }
+    
+    // Если это полный URL (Telegram CDN), возвращаем как есть (но лучше использовать серверный)
+    if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+        // Можно также преобразовать в серверный URL если есть telegramId
+        if (telegramId) {
+            try {
+                const apiUrl = await getApiUrl();
+                return `${apiUrl}/api/avatar/${telegramId}`;
+            } catch (e) {
+                // Fallback на исходный URL
+                return photoUrl;
+            }
+        }
+        return photoUrl;
+    }
+    
+    return photoUrl;
+}
 
 /**
  * Загрузка данных пользователя по telegram_id через GET запрос
