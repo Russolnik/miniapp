@@ -211,6 +211,13 @@ function updateModeCardsAccess(subscription) {
     // Проверяем подписку или пробный период (оба считаются активной подпиской)
     const hasActiveSubscription = subscription && (subscription.is_active || subscription.is_trial);
     
+    console.log('🔓 Обновление доступности карточек:', {
+        hasSubscription: !!subscription,
+        is_active: subscription?.is_active,
+        is_trial: subscription?.is_trial,
+        hasActiveSubscription: hasActiveSubscription
+    });
+    
     // Карточка Live
     const liveCard = document.querySelector('.mode-card:not(.generation-card-disabled)');
     if (liveCard && liveCard.textContent.includes('Live общение')) {
@@ -241,10 +248,20 @@ function updateModeCardsAccess(subscription) {
 // Функция проверки подписки перед открытием страницы
 function checkSubscriptionAndOpen(page) {
     // Проверяем подписку или пробный период
+    // Trial считается активной подпиской и дает доступ
     const hasActiveSub = userSubscription && userSubscription.is_active;
     const isTrial = userSubscription && userSubscription.is_trial;
+    const hasAccess = hasActiveSub || isTrial;
     
-    if (!hasActiveSub && !isTrial) {
+    console.log('🔍 Проверка доступа:', {
+        page: page,
+        hasSubscription: !!userSubscription,
+        is_active: userSubscription?.is_active,
+        is_trial: userSubscription?.is_trial,
+        hasAccess: hasAccess
+    });
+    
+    if (!hasAccess) {
         const message = '🚫 **Доступ ограничен**\n\n' +
             'Для использования этого раздела требуется активная подписка.\n\n' +
             'Используйте команду /subscription в боте для оформления подписки.';
@@ -293,23 +310,36 @@ function updateUserUI(user, subscription) {
 
     if (userAvatarEl) {
         // Если есть фото из Telegram, показываем его
-        if (user?.photoUrl) {
-            userAvatarEl.innerHTML = `<img src="${user.photoUrl}" alt="Аватар пользователя" class="user-avatar-img" onerror="this.parentElement.innerHTML='${user?.firstName?.[0]?.toUpperCase() || '👤'}'; this.parentElement.classList.remove('has-photo');" />`;
+        const photoUrl = user?.photoUrl || user?.photo_url;
+        if (photoUrl) {
+            console.log('🖼️ Загрузка аватара:', photoUrl);
+            userAvatarEl.innerHTML = `<img src="${photoUrl}" alt="Аватар пользователя" class="user-avatar-img" onerror="console.error('❌ Ошибка загрузки аватара'); this.parentElement.innerHTML='${user?.firstName?.[0]?.toUpperCase() || user?.first_name?.[0]?.toUpperCase() || '👤'}'; this.parentElement.classList.remove('has-photo');" />`;
             userAvatarEl.classList.add('has-photo');
         } else {
             // Иначе показываем первую букву имени или эмодзи
             const initial = user?.firstName?.[0]?.toUpperCase() || user?.first_name?.[0]?.toUpperCase() || '👤';
             userAvatarEl.innerHTML = initial;
             userAvatarEl.classList.remove('has-photo');
+            console.log('⚠️ Аватар не найден, используем инициал:', initial);
         }
     }
 
     if (subscriptionStatusEl) {
         // Проверяем подписку или пробный период
+        // Trial считается активной подпиской
         const hasActiveSub = subscription && subscription.is_active;
         const isTrial = subscription && subscription.is_trial;
+        const hasAccess = hasActiveSub || isTrial;
         
-        if (hasActiveSub || isTrial) {
+        console.log('📊 Обновление статуса подписки в UI:', {
+            hasSubscription: !!subscription,
+            is_active: subscription?.is_active,
+            is_trial: subscription?.is_trial,
+            days_left: subscription?.days_left,
+            hours_left: subscription?.hours_left
+        });
+        
+        if (hasAccess) {
             const daysLeft = subscription.days_left || 0;
             const hoursLeft = subscription.hours_left || 0;
             
@@ -367,10 +397,19 @@ function updateUserUI(user, subscription) {
 // Переход на страницу Live - с проверкой подписки
 function openLivePage() {
     // Проверяем подписку или пробный период перед доступом
+    // Trial считается активной подпиской и дает доступ
     const hasActiveSub = userSubscription && userSubscription.is_active;
     const isTrial = userSubscription && userSubscription.is_trial;
+    const hasAccess = hasActiveSub || isTrial;
     
-    if (!hasActiveSub && !isTrial) {
+    console.log('🔍 Проверка доступа к Live:', {
+        hasSubscription: !!userSubscription,
+        is_active: userSubscription?.is_active,
+        is_trial: userSubscription?.is_trial,
+        hasAccess: hasAccess
+    });
+    
+    if (!hasAccess) {
         const message = '🚫 **Доступ ограничен**\n\n' +
             'Для использования Live общения требуется активная подписка.\n\n' +
             'Используйте команду /subscription в боте для оформления подписки.';

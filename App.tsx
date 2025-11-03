@@ -440,7 +440,7 @@ async function getUserApiKey(): Promise<string | null> {
 }
 
 // Проверка статуса подписки перед использованием Live (сначала localhost)
-async function checkSubscriptionStatus(): Promise<{is_active: boolean; is_trial?: boolean} | null> {
+async function checkSubscriptionStatus(): Promise<{is_active: boolean; is_trial?: boolean; days_left?: number; hours_left?: number} | null> {
   try {
     // Используем getApiUrl() который уже проверяет localhost первым
     const apiUrl = await getApiUrl();
@@ -579,12 +579,24 @@ const App: React.FC = () => {
 
   const handleStartConversation = useCallback(async () => {
     // Проверяем подписку или пробный период перед началом разговора
+    // Trial считается активной подпиской и дает доступ
     if (!subscriptionChecked) {
       const status = await checkSubscriptionStatus();
       setSubscriptionStatus(status);
       setSubscriptionChecked(true);
       
-      if (!status || (!status.is_active && !status.is_trial)) {
+      const hasAccess = status && (status.is_active || status.is_trial);
+      
+      console.log('🔍 Проверка доступа к Live (App.tsx):', {
+        hasStatus: !!status,
+        is_active: status?.is_active,
+        is_trial: status?.is_trial,
+        hasAccess: hasAccess,
+        days_left: status?.days_left,
+        hours_left: status?.hours_left
+      });
+      
+      if (!hasAccess) {
         const message = '🚫 **Доступ ограничен**\n\n' +
           'Для использования Live общения требуется активная подписка.\n\n' +
           'Используйте команду /subscription в боте для оформления подписки.';
@@ -596,17 +608,22 @@ const App: React.FC = () => {
         }
         return;
       }
-    } else if (!subscriptionStatus || (!subscriptionStatus.is_active && !subscriptionStatus.is_trial)) {
-      const message = '🚫 **Доступ ограничен**\n\n' +
-        'Для использования Live общения требуется активная подписка.\n\n' +
-        'Используйте команду /subscription в боте для оформления подписки.';
+    } else {
+      // Проверяем текущий статус
+      const hasAccess = subscriptionStatus && (subscriptionStatus.is_active || (subscriptionStatus as any).is_trial);
       
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(message);
-      } else {
-        alert(message);
+      if (!hasAccess) {
+        const message = '🚫 **Доступ ограничен**\n\n' +
+          'Для использования Live общения требуется активная подписка.\n\n' +
+          'Используйте команду /subscription в боте для оформления подписки.';
+        
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert(message);
+        } else {
+          alert(message);
+        }
+        return;
       }
-      return;
     }
     
     setIsConnecting(true);
