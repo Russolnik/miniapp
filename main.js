@@ -125,10 +125,54 @@ async function loadUserDataFromServer() {
     let telegramUser = null;
     
     // Способ 1: Получаем данные из initDataUnsafe (рекомендуемый способ)
+    // Добавляем детальное логирование для диагностики
+    if (webApp.initDataUnsafe) {
+        console.log('🔍 Проверка initDataUnsafe:', {
+            hasInitDataUnsafe: true,
+            hasUser: !!webApp.initDataUnsafe.user,
+            userKeys: webApp.initDataUnsafe.user ? Object.keys(webApp.initDataUnsafe.user) : [],
+            userId: webApp.initDataUnsafe.user?.id,
+            userType: typeof webApp.initDataUnsafe.user?.id,
+            userValue: webApp.initDataUnsafe.user?.id
+        });
+    }
+    
+    // Пробуем получить user.id напрямую
     if (webApp.initDataUnsafe?.user) {
         telegramUser = webApp.initDataUnsafe.user;
-        telegramId = telegramUser.id;
-        console.log('✅ Telegram ID получен из initDataUnsafe.user.id:', `***${String(telegramId).slice(-4)}`);
+        
+        // Проверяем разные варианты получения ID
+        telegramId = telegramUser.id || telegramUser.user_id || telegramUser.userId;
+        
+        // Если ID в виде строки, пробуем преобразовать в число
+        if (telegramId && typeof telegramId === 'string') {
+            const parsedId = parseInt(telegramId, 10);
+            if (!isNaN(parsedId)) {
+                telegramId = parsedId;
+            }
+        }
+        
+        // Проверяем что id есть и это валидное число
+        if (telegramId && (typeof telegramId === 'number' || (typeof telegramId === 'string' && /^\d+$/.test(String(telegramId))))) {
+            telegramId = parseInt(telegramId, 10);
+            console.log('✅ Telegram ID получен из initDataUnsafe.user.id:', `***${String(telegramId).slice(-4)}`);
+        } else {
+            console.warn('⚠️ initDataUnsafe.user.id не является валидным ID');
+            console.warn('🔍 Полная структура user:', JSON.stringify(telegramUser, null, 2));
+            // Пробуем найти ID в других полях
+            for (const key in telegramUser) {
+                if (key.toLowerCase().includes('id') && telegramUser[key]) {
+                    const potentialId = parseInt(telegramUser[key], 10);
+                    if (!isNaN(potentialId) && potentialId > 0) {
+                        telegramId = potentialId;
+                        console.log(`✅ Telegram ID найден в поле ${key}:`, `***${String(telegramId).slice(-4)}`);
+                        break;
+                    }
+                }
+            }
+        }
+    } else {
+        console.warn('⚠️ initDataUnsafe.user недоступен');
     }
     
     // Способ 2: Если initDataUnsafe не сработал, парсим initData напрямую
