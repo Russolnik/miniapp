@@ -533,6 +533,22 @@
                         html += `Осталось: ${subscription.days_left} дн. (${subscription.hours_left.toFixed(1)} ч.)<br>`;
                         html += `Действует до: ${new Date(subscription.end_date).toLocaleString('ru-RU')}<br>`;
                         html += `Оплата: ${subscription.is_stars_payment ? 'Stars ⭐' : 'Ручная'}<br>`;
+                        
+                        // Показываем % использования для подписок на 3-6 месяцев
+                        if (subscription.usage_percent !== undefined && subscription.usage_percent !== null) {
+                            const usagePercent = subscription.usage_percent;
+                            const refundPercent = subscription.refund_percent || 0;
+                            html += `<br><strong>Использование периода:</strong><br>`;
+                            html += `Использовано: ${usagePercent.toFixed(2)}%<br>`;
+                            html += `Возможный возврат: ${refundPercent.toFixed(2)}% от суммы`;
+                            
+                            // Визуальный индикатор
+                            const progressColor = usagePercent > 50 ? '#ef5350' : (usagePercent > 25 ? '#ffa726' : '#66bb6a');
+                            html += `<div style="margin-top: 5px; width: 100%; height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden;">`;
+                            html += `<div style="width: ${usagePercent}%; height: 100%; background: ${progressColor}; transition: width 0.3s;"></div>`;
+                            html += `</div>`;
+                        }
+                        
                         html += `</div>`;
                         
                         // Кнопки управления подпиской

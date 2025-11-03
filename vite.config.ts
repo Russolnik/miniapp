@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
-// Плагин для копирования JS файлов в dist после сборки
+// Плагин для копирования JS и HTML файлов в dist после сборки
 function copyJsFiles() {
   return {
     name: 'copy-js-files',
@@ -17,6 +17,14 @@ function copyJsFiles() {
           console.log(`✅ Скопирован ${file} в dist/`);
         }
       });
+      
+      // Копируем admin.html в dist если он существует
+      const adminHtml = path.resolve(__dirname, 'admin.html');
+      const adminHtmlDest = path.resolve(__dirname, 'dist', 'admin.html');
+      if (existsSync(adminHtml)) {
+        copyFileSync(adminHtml, adminHtmlDest);
+        console.log(`✅ Скопирован admin.html в dist/`);
+      }
     }
   };
 }
@@ -60,6 +68,7 @@ export default defineConfig({
         live: path.resolve(__dirname, 'live.html'),
         generation: path.resolve(__dirname, 'generation.html'),
         about: path.resolve(__dirname, 'about.html'),
+        admin: path.resolve(__dirname, 'admin.html'),
         index: path.resolve(__dirname, 'index.html'),
         'generation-tsx': path.resolve(__dirname, 'generation.tsx'),
       },
