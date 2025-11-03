@@ -12,8 +12,15 @@ let apiUrlCheckPromise = null;
  */
 export async function checkServerAvailable(url) {
     try {
+        // Не проверяем localhost если мы на продакшн домене (HTTPS)
+        // Это вызывает CORS ошибку "unknown address space"
+        if (window.location.protocol === 'https:' && url.startsWith('http://localhost')) {
+            console.log('⚠️ Пропускаем проверку localhost на HTTPS сайте (CORS ограничение браузера)');
+            return false;
+        }
+        
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // Таймаут 3 секунды
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // Таймаут 2 секунды
         
         const response = await fetch(`${url}/health`, {
             method: 'GET',
@@ -23,6 +30,10 @@ export async function checkServerAvailable(url) {
         clearTimeout(timeoutId);
         return response.ok;
     } catch (error) {
+        // CORS ошибка для localhost - это нормально на HTTPS сайте
+        if (url.startsWith('http://localhost') && (error.name === 'TypeError' || error.message.includes('CORS'))) {
+            console.log('⚠️ CORS ошибка для localhost (это нормально на HTTPS сайте)');
+        }
         return false;
     }
 }
@@ -52,18 +63,23 @@ export async function getApiUrl() {
         console.log('🌐 Определение API сервера (сначала проверяем localhost)...');
         
         // ВСЕГДА сначала проверяем локальный сервер (для удобства разработки)
-        console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
-        try {
-            const localAvailable = await checkServerAvailable(localUrl);
-            if (localAvailable) {
-                console.log('✅ Локальный сервер доступен, используем его для разработки');
-                cachedApiUrl = localUrl;
-                return localUrl;
-            } else {
-                console.log('⚠️ Локальный сервер недоступен');
+        // Но только если мы не на HTTPS сайте (CORS ограничение браузера)
+        if (window.location.protocol === 'http:' || window.location.hostname === 'localhost') {
+            console.log('🔍 Проверка доступности локального сервера (localhost:5000)...');
+            try {
+                const localAvailable = await checkServerAvailable(localUrl);
+                if (localAvailable) {
+                    console.log('✅ Локальный сервер доступен, используем его для разработки');
+                    cachedApiUrl = localUrl;
+                    return localUrl;
+                } else {
+                    console.log('⚠️ Локальный сервер недоступен');
+                }
+            } catch (e) {
+                console.log('⚠️ Ошибка проверки локального сервера:', e.message);
             }
-        } catch (e) {
-            console.log('⚠️ Ошибка проверки локального сервера:', e.message);
+        } else {
+            console.log('ℹ️ Пропуск проверки localhost (на HTTPS сайте это вызывает CORS ошибку)');
         }
         
         // Если локальный сервер недоступен, используем production
@@ -84,7 +100,13 @@ export async function getApiUrlWithLocalhostCheck() {
     const productionUrl = window.API_URL || 'https://tg-ai-f9rj.onrender.com';
     const localUrl = 'http://localhost:5000';
     
-    // Сначала пробуем localhost
+    // Пропускаем проверку localhost если мы на HTTPS сайте (CORS ограничение браузера)
+    if (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost')) {
+        console.log('ℹ️ Пропуск проверки localhost на HTTPS сайте (CORS ограничение браузера)');
+        return productionUrl;
+    }
+    
+    // Сначала пробуем localhost (только для HTTP или локальной разработки)
     try {
         const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Timeout')), 2000)
@@ -100,6 +122,9 @@ export async function getApiUrlWithLocalhostCheck() {
         }
     } catch (e) {
         // Игнорируем ошибки, переходим к продакшн
+        if (e.name === 'TypeError' || e.message?.includes('CORS')) {
+            console.log('⚠️ CORS ошибка для localhost (это нормально на HTTPS сайте)');
+        }
     }
     
     // Если localhost недоступен, используем продакшн
