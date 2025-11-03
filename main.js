@@ -109,7 +109,27 @@ async function loadFullUserDataFromServer(telegramId) {
     if (!telegramId) return;
     
     try {
-        const apiUrl = await getApiUrl();
+        // Приоритет localhost для загрузки данных
+        let apiUrl = 'http://localhost:5000';
+        try {
+            // Используем Promise.race для таймаута
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 2000)
+            );
+            const localhostCheck = await Promise.race([
+                fetch(`${apiUrl}/health`, { method: 'GET' }),
+                timeoutPromise
+            ]);
+            if (!localhostCheck.ok) {
+                throw new Error('Localhost недоступен');
+            }
+            console.log('🌐 Используем локальный сервер для загрузки данных (localhost:5000)');
+        } catch (e) {
+            // Если localhost недоступен, используем продакшн
+            apiUrl = await getApiUrl();
+            console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
+        }
+        
         const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
             method: 'POST',
             headers: {
@@ -167,9 +187,29 @@ async function loadUserDataFromServer() {
                 telegramId = parsedId;
                 console.log('✅ Telegram ID получен из URL параметров (приоритет):', `***${String(telegramId).slice(-4)}`);
                 
-                // Сразу загружаем данные с сервера
+                // Сразу загружаем данные с сервера (приоритет localhost)
                 try {
-                    const apiUrl = await getApiUrl();
+                    // Сначала пробуем localhost
+                    let apiUrl = 'http://localhost:5000';
+                    try {
+                        // Используем Promise.race для таймаута
+                        const timeoutPromise = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Timeout')), 2000)
+                        );
+                        const localhostCheck = await Promise.race([
+                            fetch(`${apiUrl}/health`, { method: 'GET' }),
+                            timeoutPromise
+                        ]);
+                        if (!localhostCheck.ok) {
+                            throw new Error('Localhost недоступен');
+                        }
+                        console.log('🌐 Используем локальный сервер (localhost:5000)');
+                    } catch (e) {
+                        // Если localhost недоступен, используем продакшн
+                        apiUrl = await getApiUrl();
+                        console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
+                    }
+                    
                     const statusResponse = await fetch(`${apiUrl}/api/user/status?telegram_id=${telegramId}`, {
                         method: 'GET',
                         headers: {
@@ -226,9 +266,7 @@ async function loadUserDataFromServer() {
         return;
     }
     
-    let telegramId = null;
-    let telegramUser = null;
-    
+    // Если telegramId еще не получен из URL, пробуем другие способы
     // Способ 1: Получаем данные из initDataUnsafe (рекомендуемый способ)
     // Добавляем детальное логирование для диагностики
     if (webApp.initDataUnsafe) {
@@ -350,50 +388,7 @@ async function loadUserDataFromServer() {
         }
     }
     
-    // Способ 4: Пробуем получить telegram_id из URL параметров (приоритетный способ если initData пустой)
-    // Это работает когда бот открывает miniapp с параметром tg_id
-    if (!telegramId) {
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlTelegramId = urlParams.get('tg_id') || urlParams.get('telegram_id') || urlParams.get('user_id');
-            if (urlTelegramId) {
-                const parsedId = parseInt(urlTelegramId, 10);
-                if (!isNaN(parsedId) && parsedId > 100000000 && parsedId < 999999999999999) {
-                    telegramId = parsedId;
-                    console.log('✅ Telegram ID получен из URL параметров:', `***${String(telegramId).slice(-4)}`);
-                    
-                    // Если получили ID из URL, сразу делаем запрос к серверу для получения данных пользователя
-                    // Это позволит обойти проблему с пустым initData
-                    try {
-                        const apiUrl = await getApiUrl();
-                        const statusResponse = await fetch(`${apiUrl}/api/user/status?telegram_id=${telegramId}`, {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                        });
-                        
-                        if (statusResponse.ok) {
-                            const statusData = await statusResponse.json();
-                            if (statusData.user) {
-                                telegramUser = {
-                                    id: telegramId,
-                                    first_name: statusData.user.first_name || 'Пользователь',
-                                    username: statusData.user.username || null,
-                                    photo_url: statusData.user.photo_url || null
-                                };
-                                console.log('✅ Данные пользователя получены через GET запрос с telegram_id:', `***${String(telegramId).slice(-4)}`);
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('⚠️ Ошибка получения данных через GET запрос:', e);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ Ошибка получения ID из URL:', e);
-        }
-    }
+    // Способ 4 удален - уже обработано в ШАГ 0 в начале функции
     
     // Способ 5: Если initData есть, пробуем получить через сервер с валидацией initData
     if (!telegramId && webApp.initData && webApp.initData.length > 0) {
@@ -402,7 +397,26 @@ async function loadUserDataFromServer() {
             initDataLength: webApp.initData?.length || 0
         });
         try {
-            const apiUrl = await getApiUrl();
+            // Приоритет localhost
+            let apiUrl = 'http://localhost:5000';
+            try {
+                // Используем Promise.race для таймаута
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 2000)
+                );
+                const localhostCheck = await Promise.race([
+                    fetch(`${apiUrl}/health`, { method: 'GET' }),
+                    timeoutPromise
+                ]);
+                if (!localhostCheck.ok) {
+                    throw new Error('Localhost недоступен');
+                }
+                console.log('🌐 Используем локальный сервер (localhost:5000)');
+            } catch (e) {
+                // Если localhost недоступен, используем продакшн
+                apiUrl = await getApiUrl();
+                console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
+            }
             
             const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
                 method: 'POST',
@@ -489,14 +503,34 @@ async function loadUserDataFromServer() {
 
     // ШАГ 2: Загружаем данные пользователя и статус подписки с сервера по telegram_id
     // Отправляем только telegram_id, остальное сервер получит из БД
-    const apiUrl = await getApiUrl();
+    // Приоритет localhost
+    let apiUrl = 'http://localhost:5000';
+    try {
+        // Используем Promise.race для таймаута
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+        );
+        const localhostCheck = await Promise.race([
+            fetch(`${apiUrl}/health`, { method: 'GET' }),
+            timeoutPromise
+        ]);
+        if (!localhostCheck.ok) {
+            throw new Error('Localhost недоступен');
+        }
+        console.log('🌐 Используем локальный сервер для загрузки данных (localhost:5000)');
+    } catch (e) {
+        // Если localhost недоступен, используем продакшн
+        apiUrl = await getApiUrl();
+        console.log('🌐 Локальный сервер недоступен, используем продакшн:', apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1'));
+    }
     
     try {
         // Получаем initData для валидации на сервере (только для безопасности)
         const initDataForServer = webApp.initData || null;
         
         console.log('📡 Запрос к серверу для получения данных пользователя по telegram_id...', {
-            telegramId: `***${String(telegramId).slice(-4)}`
+            telegramId: `***${String(telegramId).slice(-4)}`,
+            apiUrl: apiUrl.replace(/https?:\/\/([^.]+).*/, '***$1')
         });
         
         const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
