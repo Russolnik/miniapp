@@ -527,12 +527,43 @@
                     // Информация о подписке
                     const subscription = user.active_subscription;
                     if (subscription) {
+                        // Форматируем время детально (дни и часы)
+                        const totalHours = subscription.hours_left || 0;
+                        const days = Math.floor(totalHours / 24);
+                        const hours = Math.floor(totalHours % 24);
+                        
+                        let timeLeftText = '';
+                        if (days > 0 && hours > 0) {
+                            timeLeftText = `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} и ${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
+                        } else if (days > 0) {
+                            timeLeftText = `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}`;
+                        } else if (hours > 0) {
+                            timeLeftText = `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
+                        }
+                        
+                        const trialHoursAdded = subscription.trial_hours_added || 0;
+                        let trialInfo = '';
+                        if (trialHoursAdded > 0) {
+                            const trialDays = Math.floor(trialHoursAdded / 24);
+                            const trialHours = Math.floor(trialHoursAdded % 24);
+                            if (trialDays > 0 && trialHours > 0) {
+                                trialInfo = `<br>🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} ${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
+                            } else if (trialDays > 0) {
+                                trialInfo = `<br>🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} из пробного периода`;
+                            } else if (trialHours > 0) {
+                                trialInfo = `<br>🎁 +${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
+                            }
+                        }
+                        
                         html += `<div style="margin-top: 10px; padding: 10px; background: white; border-radius: 8px;">`;
                         html += `<strong>💎 Активная подписка:</strong><br>`;
                         html += `Тип: ${subscription.type}<br>`;
-                        html += `Осталось: ${subscription.days_left} дн. (${subscription.hours_left.toFixed(1)} ч.)<br>`;
+                        html += `Осталось: ${timeLeftText || '0'}<br>`;
                         html += `Действует до: ${new Date(subscription.end_date).toLocaleString('ru-RU')}<br>`;
                         html += `Оплата: ${subscription.is_stars_payment ? 'Stars ⭐' : 'Ручная'}<br>`;
+                        if (trialInfo) {
+                            html += trialInfo;
+                        }
                         
                         // Показываем % использования для подписок на 3-6 месяцев
                         if (subscription.usage_percent !== undefined && subscription.usage_percent !== null) {

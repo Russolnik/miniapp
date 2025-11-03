@@ -203,15 +203,15 @@ async function loadUserDataFromServer() {
     });
 
     // ШАГ 2: Загружаем данные пользователя и статус подписки с сервера по telegram_id
+    // Отправляем только telegram_id, остальное сервер получит из БД
     const apiUrl = await getApiUrl();
     
     try {
-        // Получаем initData для валидации на сервере
-        const initDataForServer = webApp?.initData || null;
+        // Получаем initData для валидации на сервере (только для безопасности)
+        const initDataForServer = webApp.initData || null;
         
-        console.log('📡 Запрос к серверу для получения данных пользователя...', {
-            telegramId: `***${String(telegramId).slice(-4)}`,
-            hasInitData: !!initDataForServer
+        console.log('📡 Запрос к серверу для получения данных пользователя по telegram_id...', {
+            telegramId: `***${String(telegramId).slice(-4)}`
         });
         
         const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
@@ -221,7 +221,7 @@ async function loadUserDataFromServer() {
             },
             body: JSON.stringify({ 
                 telegram_id: telegramId,
-                initData: initDataForServer
+                initData: initDataForServer  // Для валидации, если нужно
             }),
         });
 
@@ -426,12 +426,19 @@ function updateUserUI(user, subscription) {
                     statusText = '🎁 Пробный период';
                 }
             } else {
+                // Форматируем время детально (дни и часы)
+                const totalHours = hoursLeft || 0;
+                const days = Math.floor(totalHours / 24);
+                const hours = Math.floor(totalHours % 24);
+                
                 const trialHoursAdded = subscription.trial_hours_added || 0;
                 
-                if (daysLeft > 0) {
-                    statusText = `💎 Подписка активна (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
-                } else if (hoursLeft > 0) {
-                    statusText = `💎 Подписка активна (${Math.floor(hoursLeft)} ч.)`;
+                if (days > 0 && hours > 0) {
+                    statusText = `💎 Подписка активна (${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} и ${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'})`;
+                } else if (days > 0) {
+                    statusText = `💎 Подписка активна (${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'})`;
+                } else if (hours > 0) {
+                    statusText = `💎 Подписка активна (${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'})`;
                 } else {
                     statusText = '💎 Подписка активна';
                 }
@@ -439,16 +446,13 @@ function updateUserUI(user, subscription) {
                 // Добавляем информацию о пробном периоде, если он был включен
                 if (trialHoursAdded > 0) {
                     const trialDays = Math.floor(trialHoursAdded / 24);
-                    const trialHours = trialHoursAdded % 24;
-                    if (trialDays > 0) {
-                        statusText += `\n🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'}`;
-                        if (trialHours > 0) {
-                            statusText += ` ${trialHours} ч. из пробного периода`;
-                        } else {
-                            statusText += ' из пробного периода';
-                        }
+                    const trialHours = Math.floor(trialHoursAdded % 24);
+                    if (trialDays > 0 && trialHours > 0) {
+                        statusText += `\n🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} ${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
+                    } else if (trialDays > 0) {
+                        statusText += `\n🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'} из пробного периода`;
                     } else if (trialHours > 0) {
-                        statusText += `\n🎁 +${trialHours} ч. из пробного периода`;
+                        statusText += `\n🎁 +${trialHours} ${trialHours === 1 ? 'час' : trialHours < 5 ? 'часа' : 'часов'} из пробного периода`;
                     }
                 }
             }
