@@ -73,32 +73,75 @@ async function getApiUrl() {
 
 // Загрузка данных пользователя с сервера (обновленная версия с initData)
 async function loadUserDataFromServer() {
-    // Получаем telegram_id и initData из Telegram WebApp
+    // Получаем telegram_id и initData из Telegram WebApp (несколько способов)
     let telegramId = null;
     let telegramUser = null;
     let initData = null;
     
-    if (tg?.initDataUnsafe?.user) {
+    // Используем улучшенную функцию получения ID
+    telegramId = getTelegramIdFromWebApp();
+    
+    // Получаем данные пользователя
+    const webApp = window.Telegram?.WebApp || tg;
+    
+    if (webApp?.initDataUnsafe?.user) {
         // Используем данные из initDataUnsafe (основной способ)
-        telegramUser = tg.initDataUnsafe.user;
-        telegramId = telegramUser.id;
-    } else if (tg?.initData) {
+        telegramUser = webApp.initDataUnsafe.user;
+        if (!telegramId) {
+            telegramId = telegramUser.id;
+        }
+    } else if (webApp?.initData) {
         // Если initDataUnsafe не доступен, пробуем парсить initData
-        initData = tg.initData;
+        initData = webApp.initData;
         try {
-            const urlParams = new URLSearchParams(tg.initData);
+            const urlParams = new URLSearchParams(webApp.initData);
             const userStr = urlParams.get('user');
             if (userStr) {
                 telegramUser = JSON.parse(userStr);
-                telegramId = telegramUser.id || null;
+                if (!telegramId) {
+                    telegramId = telegramUser.id || null;
+                }
             }
         } catch (e) {
             console.warn('Не удалось распарсить initData:', e);
         }
     }
     
+    if (!telegramId) {
+        console.error('❌ Telegram ID не найден. Пробуем получить с сервера...');
+        // Последняя попытка - запрос к серверу без telegram_id (сервер попробует получить из initData)
+        const apiUrl = await getApiUrl();
+        const webAppForInitData = window.Telegram?.WebApp || tg;
+        const initDataForServer = webAppForInitData?.initData || initData;
+        
+        if (initDataForServer) {
+            try {
+                const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        initData: initDataForServer
+                    }),
+                });
+                
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    if (statusData.user?.telegram_id) {
+                        telegramId = statusData.user.telegram_id;
+                        telegramUser = statusData.user;
+                        console.log('✅ Telegram ID получен с сервера через initData валидацию');
+                    }
+                }
+            } catch (e) {
+                console.error('❌ Ошибка получения ID с сервера:', e);
+            }
+        }
+    }
+    
     if (!telegramId || !telegramUser) {
-        console.error('❌ Данные пользователя Telegram не найдены');
+        console.error('❌ Данные пользователя Telegram не найдены. Используем заглушку.');
         currentUser = {
             telegramId: null,
             firstName: 'Пользователь',
@@ -424,7 +467,27 @@ window.showGenerationDisabled = showGenerationDisabled;
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async () => {
-    if (tg) {
+    // Ждем немного, чтобы Telegram WebApp успел загрузиться
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    const waitForTelegramWebApp = () => {
+        return new Promise((resolve) => {
+            const checkInterval = setInterval(() => {
+                attempts++;
+                if (window.Telegram?.WebApp || attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        });
+    };
+    
+    await waitForTelegramWebApp();
+    
+    // Обновляем глобальную переменную tg
+    if (window.Telegram?.WebApp) {
+        tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
         // setHeaderColor и setBackgroundColor не поддерживаются в версии 6.0+
