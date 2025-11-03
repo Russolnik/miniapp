@@ -2,6 +2,7 @@
 const ADMIN_PASSWORD = '240123';
 let currentEditingUser = null;
 let originalUserData = null;
+let pendingAction = null; // Сохраняем действие для подтверждения
 
 // Получение API URL (сначала localhost, потом production)
 async function getApiUrl() {
@@ -114,16 +115,78 @@ async function loadStats() {
     }
 }
 
-// Поиск пользователя
+// Поиск пользователя (по ID или username)
 async function adminSearchUser() {
     const searchTerm = document.getElementById('admin-search-user').value.trim();
     if (!searchTerm) {
-        showNotification('Введите ID или username для поиска', 'error');
+        showNotification('Введите Telegram ID или username для поиска', 'error');
         return;
     }
     
+    // Поиск работает как по ID (число), так и по username (строка)
     await adminShowUserInfo(searchTerm);
 }
+
+// Модальное окно подтверждения
+function showConfirmModal(title, message, changes, onConfirm) {
+    const modal = document.getElementById('confirm-modal');
+    const header = document.getElementById('confirm-modal-header');
+    const messageDiv = document.getElementById('confirm-modal-message');
+    const changesDiv = document.getElementById('confirm-changes-list');
+    const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
+    
+    header.textContent = title;
+    messageDiv.textContent = message;
+    
+    // Показываем список изменений если есть
+    if (changes && changes.length > 0) {
+        changesDiv.style.display = 'block';
+        let changesHtml = '<div style="margin-bottom: 12px;"><strong>Изменения:</strong></div>';
+        changes.forEach(change => {
+            changesHtml += `
+                <div class="confirm-change-item">
+                    <div class="confirm-change-label">${change.label}:</div>
+                    <div class="confirm-change-old">Было: ${change.old || '—'}</div>
+                    <div class="confirm-change-new">Станет: ${change.new || '—'}</div>
+                </div>
+            `;
+        });
+        changesDiv.innerHTML = changesHtml;
+    } else {
+        changesDiv.style.display = 'none';
+    }
+    
+    // Удаляем предыдущий обработчик и добавляем новый
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    
+    newConfirmBtn.onclick = () => {
+        closeConfirmModal();
+        if (onConfirm) {
+            onConfirm();
+        }
+    };
+    
+    modal.classList.add('show');
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.remove('show');
+    pendingAction = null;
+}
+
+// Закрытие модального окна при клике вне его
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeConfirmModal();
+            }
+        });
+    }
+});
 
 // Отображение информации о пользователе
 async function adminShowUserInfo(searchTerm) {
@@ -204,10 +267,10 @@ function renderUserInfo(user, container) {
     // Кнопки управления пробным периодом
     html += '<div class="admin-actions">';
     if (!trial.is_active && !trial.trial_used) {
-        html += `<button class="btn btn-primary" onclick="adminActivateTrial(${user.telegram_id})">Активировать пробный период</button>`;
+        html += `<button class="admin-btn admin-btn-success" onclick="adminActivateTrial(${user.telegram_id})">✅ Активировать пробный период</button>`;
     }
     if (trial.is_active || trial.trial_used) {
-        html += `<button class="btn" onclick="adminDeactivateTrial(${user.telegram_id})" style="background: #ef5350; color: white;">Удалить пробный период</button>`;
+        html += `<button class="admin-btn admin-btn-danger" onclick="adminDeactivateTrial(${user.telegram_id})">❌ Удалить пробный период</button>`;
     }
     html += '</div>';
     
@@ -255,16 +318,16 @@ function renderUserInfo(user, container) {
         // Кнопки управления подпиской
         html += '<div class="admin-actions">';
         html += '<div class="admin-btn-group">';
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('1_month', ${user.telegram_id})">+1 месяц</button>`;
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('3_months', ${user.telegram_id})">+3 месяца</button>`;
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('6_months', ${user.telegram_id})">+6 месяцев</button>`;
+        html += `<button class="admin-btn admin-btn-small" onclick="adminCreateSubscription('1_month', ${user.telegram_id})">+1 месяц</button>`;
+        html += `<button class="admin-btn admin-btn-small" onclick="adminCreateSubscription('3_months', ${user.telegram_id})">+3 месяца</button>`;
+        html += `<button class="admin-btn admin-btn-small" onclick="adminCreateSubscription('6_months', ${user.telegram_id})">+6 месяцев</button>`;
         html += '</div>';
         
         if (subscription.is_active) {
-            html += `<button class="btn" onclick="adminPauseSubscription(${user.telegram_id})" style="background: #ffa726;">Пауза</button>`;
-            html += `<button class="btn" onclick="adminStopSubscription(${user.telegram_id})" style="background: #ef5350; color: white;">Остановить</button>`;
+            html += `<button class="admin-btn admin-btn-warning" onclick="adminPauseSubscription(${user.telegram_id})">⏸ Пауза</button>`;
+            html += `<button class="admin-btn admin-btn-danger" onclick="adminStopSubscription(${user.telegram_id})">⏹ Остановить</button>`;
         } else {
-            html += `<button class="btn" onclick="adminResumeSubscription(${user.telegram_id})" style="background: #66bb6a; color: white;">Возобновить</button>`;
+            html += `<button class="admin-btn admin-btn-success" onclick="adminResumeSubscription(${user.telegram_id})">▶ Возобновить</button>`;
         }
         html += '</div>';
     } else {
@@ -273,9 +336,9 @@ function renderUserInfo(user, container) {
         
         html += '<div class="admin-actions">';
         html += '<div class="admin-btn-group">';
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('1_month', ${user.telegram_id})">Добавить 1 месяц</button>`;
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('3_months', ${user.telegram_id})">Добавить 3 месяца</button>`;
-        html += `<button class="btn btn-primary" onclick="adminCreateSubscription('6_months', ${user.telegram_id})">Добавить 6 месяцев</button>`;
+        html += `<button class="admin-btn" onclick="adminCreateSubscription('1_month', ${user.telegram_id})">+1 месяц</button>`;
+        html += `<button class="admin-btn" onclick="adminCreateSubscription('3_months', ${user.telegram_id})">+3 месяца</button>`;
+        html += `<button class="admin-btn" onclick="adminCreateSubscription('6_months', ${user.telegram_id})">+6 месяцев</button>`;
         html += '</div></div>';
     }
     
@@ -325,8 +388,28 @@ function showNotification(message, type) {
 
 // Функции управления пробным периодом
 async function adminActivateTrial(telegramId) {
-    if (!confirm(`Активировать пробный период для пользователя ${telegramId}?`)) return;
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
     
+    const oldTrialStatus = currentEditingUser.trial_status?.is_active ? 'Активен' : (currentEditingUser.trial_status?.trial_used ? 'Использован' : 'Не активен');
+    
+    const changes = [{
+        label: 'Пробный период',
+        old: oldTrialStatus,
+        new: 'Активен (24 часа)'
+    }];
+    
+    showConfirmModal(
+        'Активировать пробный период',
+        `Вы уверены, что хотите активировать пробный период для пользователя ${telegramId}?`,
+        changes,
+        () => executeActivateTrial(telegramId)
+    );
+}
+
+async function executeActivateTrial(telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/trial/activate`, {
@@ -351,8 +434,28 @@ async function adminActivateTrial(telegramId) {
 }
 
 async function adminDeactivateTrial(telegramId) {
-    if (!confirm(`Удалить пробный период для пользователя ${telegramId}?`)) return;
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
     
+    const oldTrialStatus = currentEditingUser.trial_status?.is_active ? 'Активен' : (currentEditingUser.trial_status?.trial_used ? 'Использован' : 'Не активен');
+    
+    const changes = [{
+        label: 'Пробный период',
+        old: oldTrialStatus,
+        new: 'Удален'
+    }];
+    
+    showConfirmModal(
+        'Удалить пробный период',
+        `Вы уверены, что хотите удалить пробный период для пользователя ${telegramId}?`,
+        changes,
+        () => executeDeactivateTrial(telegramId)
+    );
+}
+
+async function executeDeactivateTrial(telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/trial/deactivate`, {
@@ -378,14 +481,44 @@ async function adminDeactivateTrial(telegramId) {
 
 // Функции управления подписками
 async function adminCreateSubscription(subscriptionType, telegramId) {
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
+    
     const typeNames = {
         '1_month': '1 месяц',
         '3_months': '3 месяца',
         '6_months': '6 месяцев'
     };
     
-    if (!confirm(`Добавить подписку ${typeNames[subscriptionType]} пользователю ${telegramId}?`)) return;
+    const oldSubscription = currentEditingUser.active_subscription;
+    const oldStatus = oldSubscription ? 
+        `${oldSubscription.type} (до ${formatDate(oldSubscription.end_date)})` : 
+        'Нет подписки';
     
+    // Рассчитываем новую дату окончания
+    const now = new Date();
+    const oldEndDate = oldSubscription ? new Date(oldSubscription.end_date) : now;
+    const monthsToAdd = subscriptionType === '1_month' ? 1 : (subscriptionType === '3_months' ? 3 : 6);
+    const newEndDate = new Date(oldEndDate);
+    newEndDate.setMonth(newEndDate.getMonth() + monthsToAdd);
+    
+    const changes = [{
+        label: 'Подписка',
+        old: oldStatus,
+        new: `${oldSubscription ? 'Продлена до' : 'Добавлена'} ${formatDate(newEndDate.toISOString())}`
+    }];
+    
+    showConfirmModal(
+        'Добавить подписку',
+        `Добавить подписку ${typeNames[subscriptionType]} пользователю ${telegramId}?`,
+        changes,
+        () => executeCreateSubscription(subscriptionType, telegramId)
+    );
+}
+
+async function executeCreateSubscription(subscriptionType, telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/subscription/create`, {
@@ -411,8 +544,26 @@ async function adminCreateSubscription(subscriptionType, telegramId) {
 }
 
 async function adminPauseSubscription(telegramId) {
-    if (!confirm(`Поставить подписку пользователя ${telegramId} на паузу?`)) return;
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
     
+    const changes = [{
+        label: 'Статус подписки',
+        old: 'Активна',
+        new: 'На паузе'
+    }];
+    
+    showConfirmModal(
+        'Поставить подписку на паузу',
+        `Поставить подписку пользователя ${telegramId} на паузу?`,
+        changes,
+        () => executePauseSubscription(telegramId)
+    );
+}
+
+async function executePauseSubscription(telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/subscription/pause`, {
@@ -437,8 +588,26 @@ async function adminPauseSubscription(telegramId) {
 }
 
 async function adminResumeSubscription(telegramId) {
-    if (!confirm(`Возобновить подписку пользователя ${telegramId}?`)) return;
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
     
+    const changes = [{
+        label: 'Статус подписки',
+        old: 'На паузе',
+        new: 'Активна'
+    }];
+    
+    showConfirmModal(
+        'Возобновить подписку',
+        `Возобновить подписку пользователя ${telegramId}?`,
+        changes,
+        () => executeResumeSubscription(telegramId)
+    );
+}
+
+async function executeResumeSubscription(telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/subscription/resume`, {
@@ -463,8 +632,31 @@ async function adminResumeSubscription(telegramId) {
 }
 
 async function adminStopSubscription(telegramId) {
-    if (!confirm(`⚠️ ВНИМАНИЕ! Остановить подписку пользователя ${telegramId}?\n\nЭто действие нельзя отменить!`)) return;
+    if (!currentEditingUser) {
+        showNotification('Сначала загрузите информацию о пользователе', 'error');
+        return;
+    }
     
+    const oldSubscription = currentEditingUser.active_subscription;
+    const oldStatus = oldSubscription ? 
+        `${oldSubscription.type} (до ${formatDate(oldSubscription.end_date)})` : 
+        'Нет подписки';
+    
+    const changes = [{
+        label: 'Подписка',
+        old: oldStatus,
+        new: 'Остановлена'
+    }];
+    
+    showConfirmModal(
+        '⚠️ Остановить подписку',
+        `ВНИМАНИЕ! Вы уверены, что хотите остановить подписку пользователя ${telegramId}?\n\nЭто действие нельзя отменить!`,
+        changes,
+        () => executeStopSubscription(telegramId)
+    );
+}
+
+async function executeStopSubscription(telegramId) {
     const apiUrl = await getApiUrl();
     try {
         const response = await fetch(`${apiUrl}/api/admin/subscription/stop`, {
@@ -524,7 +716,7 @@ async function adminLoadUsersList() {
                     <td style="padding: 8px; border: 1px solid rgba(79, 195, 247, 0.3);">${user.username || '—'}</td>
                     <td style="padding: 8px; border: 1px solid rgba(79, 195, 247, 0.3);">${user.first_name || '—'}</td>
                     <td style="padding: 8px; border: 1px solid rgba(79, 195, 247, 0.3);">
-                        <button class="btn btn-primary" onclick="adminShowUserInfo('${user.telegram_id}')" style="padding: 5px 10px; font-size: 12px;">Подробнее</button>
+                        <button class="admin-btn admin-btn-small" onclick="adminShowUserInfo('${user.telegram_id}')">Подробнее</button>
                     </td>
                 </tr>`;
             });
@@ -550,6 +742,7 @@ window.adminCreateSubscription = adminCreateSubscription;
 window.adminPauseSubscription = adminPauseSubscription;
 window.adminResumeSubscription = adminResumeSubscription;
 window.adminStopSubscription = adminStopSubscription;
+window.closeConfirmModal = closeConfirmModal;
 
 // Инициализация Telegram WebApp
 if (window.Telegram && window.Telegram.WebApp) {

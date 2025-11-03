@@ -162,6 +162,225 @@
         .admin-view-mode.hidden {
             display: none;
         }
+        
+        /* Улучшенные стили для кнопок в админке */
+        .admin-btn {
+            background: linear-gradient(135deg, var(--sky-blue) 0%, var(--sky-blue-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px var(--shadow-soft);
+            position: relative;
+            overflow: hidden;
+            font-family: 'Rubik', sans-serif;
+        }
+        
+        .admin-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+        
+        .admin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--shadow-medium);
+        }
+        
+        .admin-btn:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+        
+        .admin-btn:active {
+            transform: translateY(0);
+        }
+        
+        .admin-btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 12px;
+        }
+        
+        .admin-btn-danger {
+            background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+        }
+        
+        .admin-btn-warning {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+        }
+        
+        .admin-btn-success {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+        }
+        
+        .theme-night .admin-btn,
+        [data-theme="night"] .admin-btn {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Модальное окно подтверждения */
+        .confirm-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        
+        .confirm-modal.show {
+            display: flex;
+        }
+        
+        .confirm-modal-content {
+            background: var(--cloud-white);
+            border-radius: 24px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        
+        .theme-night .confirm-modal-content,
+        [data-theme="night"] .confirm-modal-content {
+            background: var(--night-card-bg);
+            border: 1px solid var(--night-border);
+        }
+        
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .confirm-modal-header {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+        
+        .theme-night .confirm-modal-header,
+        [data-theme="night"] .confirm-modal-header {
+            color: var(--night-text-primary);
+        }
+        
+        .confirm-modal-body {
+            margin-bottom: 24px;
+        }
+        
+        .confirm-changes-list {
+            background: rgba(79, 195, 247, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .theme-night .confirm-changes-list,
+        [data-theme="night"] .confirm-changes-list {
+            background: rgba(63, 81, 181, 0.2);
+        }
+        
+        .confirm-change-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(79, 195, 247, 0.2);
+        }
+        
+        .confirm-change-item:last-child {
+            border-bottom: none;
+        }
+        
+        .confirm-change-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .theme-night .confirm-change-label,
+        [data-theme="night"] .confirm-change-label {
+            color: var(--night-text-primary);
+        }
+        
+        .confirm-change-old {
+            color: #ef5350;
+            font-size: 14px;
+        }
+        
+        .confirm-change-new {
+            color: #66bb6a;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .confirm-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .confirm-btn {
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+        }
+        
+        .confirm-btn-cancel {
+            background: var(--cloud-white);
+            color: var(--text-primary);
+            border: 2px solid rgba(79, 195, 247, 0.3);
+        }
+        
+        .confirm-btn-cancel:hover {
+            background: rgba(79, 195, 247, 0.1);
+            border-color: var(--sky-blue);
+        }
+        
+        .confirm-btn-confirm {
+            background: linear-gradient(135deg, var(--sky-blue) 0%, var(--sky-blue-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 12px var(--shadow-soft);
+        }
+        
+        .confirm-btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--shadow-medium);
+        }
+        
+        .theme-night .confirm-btn-cancel,
+        [data-theme="night"] .confirm-btn-cancel {
+            background: var(--night-card-bg);
+            border-color: var(--night-border);
+            color: var(--night-text-primary);
+        }
     </style>
 </head>
 <body>
@@ -223,7 +442,7 @@
             <div class="admin-section">
                 <h2 style="margin-bottom: 16px;">🔍 Поиск пользователя</h2>
                 <div class="admin-search-container">
-                    <input type="text" id="admin-search-user" class="admin-search-input" placeholder="Поиск по ID, username или имени..." autocomplete="off">
+                    <input type="text" id="admin-search-user" class="admin-search-input" placeholder="Поиск по Telegram ID или username..." autocomplete="off">
                 </div>
                 <button class="btn btn-primary" onclick="adminSearchUser()" style="width: 100%; margin-bottom: 10px;">Найти</button>
                 <button class="btn" onclick="adminLoadUsersList()" style="width: 100%; background: #42a5f5; color: white;">📋 Загрузить всех пользователей</button>
@@ -236,6 +455,21 @@
                     <h3 id="admin-user-info-title" style="margin-bottom: 20px;">Информация о пользователе</h3>
                     <div id="admin-user-info-content"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно подтверждения -->
+    <div id="confirm-modal" class="confirm-modal">
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-header" id="confirm-modal-header">Подтверждение действия</div>
+            <div class="confirm-modal-body">
+                <div id="confirm-modal-message"></div>
+                <div id="confirm-changes-list" class="confirm-changes-list" style="display: none;"></div>
+            </div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-btn confirm-btn-cancel" onclick="closeConfirmModal()">Отмена</button>
+                <button class="confirm-btn confirm-btn-confirm" id="confirm-modal-confirm-btn">Подтвердить</button>
             </div>
         </div>
     </div>
