@@ -181,30 +181,12 @@ async function loadUserDataFromServer() {
 
 // Обновление доступности карточек режимов в зависимости от подписки
 function updateModeCardsAccess(subscription) {
+    // Проверяем подписку или пробный период (оба считаются активной подпиской)
     const hasActiveSubscription = subscription && (subscription.is_active || subscription.is_trial);
     
     // Карточка Live
-    const liveCard = document.querySelector('.mode-card[onclick*="openLivePage"], .mode-card:has(.mode-icon:contains("🗣️"))');
-    if (!liveCard) {
-        // Альтернативный поиск по тексту
-        const cards = document.querySelectorAll('.mode-card');
-        cards.forEach(card => {
-            if (card.textContent.includes('Live общение')) {
-                const tempCard = card;
-                if (!hasActiveSubscription) {
-                    tempCard.classList.add('disabled');
-                    tempCard.style.opacity = '0.6';
-                    tempCard.style.cursor = 'not-allowed';
-                    tempCard.setAttribute('onclick', 'checkSubscriptionAndOpen("live")');
-                } else {
-                    tempCard.classList.remove('disabled');
-                    tempCard.style.opacity = '1';
-                    tempCard.style.cursor = 'pointer';
-                    tempCard.setAttribute('onclick', 'openLivePage()');
-                }
-            }
-        });
-    } else {
+    const liveCard = document.querySelector('.mode-card:not(.generation-card-disabled)');
+    if (liveCard && liveCard.textContent.includes('Live общение')) {
         if (!hasActiveSubscription) {
             liveCard.classList.add('disabled');
             liveCard.style.opacity = '0.6';

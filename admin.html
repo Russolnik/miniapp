@@ -577,6 +577,185 @@
             }
         }
         
+        // Функции управления подписками
+        async function adminCreateSubscription(subscriptionType) {
+            const userIdInput = document.getElementById('admin-user-id');
+            const telegramId = userIdInput ? userIdInput.value.trim() : '';
+            
+            if (!telegramId) {
+                showResult('Введите Telegram ID пользователя', 'error');
+                return;
+            }
+            
+            const typeNames = {
+                '1_month': '1 месяц',
+                '3_months': '3 месяца',
+                '6_months': '6 месяцев'
+            };
+            
+            const confirmMessage = `Вы уверены, что хотите добавить подписку ${typeNames[subscriptionType]} пользователю ${telegramId}?`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/subscription/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        telegram_id: telegramId,
+                        subscription_type: subscriptionType
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Подписка успешно добавлена пользователю ${telegramId}`, 'success');
+                    // Обновляем информацию о пользователе если она открыта
+                    if (telegramId) {
+                        setTimeout(() => adminShowUserInfo(telegramId), 1000);
+                    }
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
+                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+        
+        async function adminPauseSubscription() {
+            const userIdInput = document.getElementById('admin-user-id');
+            const telegramId = userIdInput ? userIdInput.value.trim() : '';
+            
+            if (!telegramId) {
+                showResult('Сначала найдите пользователя и выберите его', 'error');
+                return;
+            }
+            
+            if (!confirm(`Вы уверены, что хотите поставить подписку пользователя ${telegramId} на паузу?`)) {
+                return;
+            }
+            
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/subscription/pause`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        telegram_id: telegramId
+                    })
+                });
+                
+                if (response.ok) {
+                    showResult(`✅ Подписка пользователя ${telegramId} поставлена на паузу`, 'success');
+                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
+                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+        
+        async function adminResumeSubscription() {
+            const userIdInput = document.getElementById('admin-user-id');
+            const telegramId = userIdInput ? userIdInput.value.trim() : '';
+            
+            if (!telegramId) {
+                showResult('Сначала найдите пользователя и выберите его', 'error');
+                return;
+            }
+            
+            if (!confirm(`Вы уверены, что хотите возобновить подписку пользователя ${telegramId}?`)) {
+                return;
+            }
+            
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/subscription/resume`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        telegram_id: telegramId
+                    })
+                });
+                
+                if (response.ok) {
+                    showResult(`✅ Подписка пользователя ${telegramId} возобновлена`, 'success');
+                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
+                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+        
+        async function adminStopSubscription() {
+            const userIdInput = document.getElementById('admin-user-id');
+            const telegramId = userIdInput ? userIdInput.value.trim() : '';
+            
+            if (!telegramId) {
+                showResult('Сначала найдите пользователя и выберите его', 'error');
+                return;
+            }
+            
+            if (!confirm(`⚠️ ВНИМАНИЕ! Вы уверены, что хотите остановить подписку пользователя ${telegramId}?\n\nЭто действие нельзя отменить!`)) {
+                return;
+            }
+            
+            const password = localStorage.getItem('admin_password') || '240123';
+            const apiUrl = await getApiUrl();
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/subscription/stop`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        telegram_id: telegramId
+                    })
+                });
+                
+                if (response.ok) {
+                    showResult(`✅ Подписка пользователя ${telegramId} остановлена`, 'success');
+                    setTimeout(() => adminShowUserInfo(telegramId), 1000);
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Неизвестная ошибка' }));
+                    showResult(`❌ Ошибка: ${error.error || 'Неизвестная ошибка'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Ошибка: ${error.message}`, 'error');
+            }
+        }
+        
+        // Делаем функции глобальными
+        window.adminCreateSubscription = adminCreateSubscription;
+        window.adminPauseSubscription = adminPauseSubscription;
+        window.adminResumeSubscription = adminResumeSubscription;
+        window.adminStopSubscription = adminStopSubscription;
+        
         // Поддержка Enter для поиска
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.getElementById('admin-search-user');
