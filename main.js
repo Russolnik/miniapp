@@ -245,14 +245,77 @@ async function loadUserDataFromServer() {
         }
     }
     
-    // Если не удалось получить данные, показываем заглушку
+    // Способ 4: Если initData есть (даже если пустой), пробуем получить через сервер
+    // с валидацией initData на сервере
+    if (!telegramId) {
+        console.log('🔍 Пробуем получить telegram_id через сервер с валидацией initData...', {
+            hasInitData: !!webApp.initData,
+            initDataLength: webApp.initData?.length || 0
+        });
+        try {
+            const apiUrl = await getApiUrl();
+            const requestBody = {};
+            if (webApp.initData && webApp.initData.length > 0) {
+                requestBody.initData = webApp.initData;
+            }
+            
+            const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+            });
+            
+            if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                if (statusData.user && statusData.user.telegram_id) {
+                    telegramId = statusData.user.telegram_id;
+                    telegramUser = {
+                        id: telegramId,
+                        first_name: statusData.user.first_name || 'Пользователь',
+                        username: statusData.user.username || null,
+                        photo_url: statusData.user.photo_url || null
+                    };
+                    console.log('✅ Telegram ID получен через сервер:', `***${String(telegramId).slice(-4)}`);
+                } else if (statusData.error) {
+                    console.warn('⚠️ Сервер вернул ошибку:', statusData.error);
+                }
+            } else {
+                const errorData = await statusResponse.json().catch(() => ({ error: 'Unknown error' }));
+                console.warn('⚠️ Ошибка ответа сервера:', statusResponse.status, errorData);
+            }
+        } catch (e) {
+            console.error('❌ Ошибка получения ID через сервер:', e);
+        }
+    }
+    
+    // Если не удалось получить данные, показываем заглушку с инструкцией
     if (!telegramId || !telegramUser) {
         console.error('❌ Не удалось получить Telegram ID. Доступные данные:', {
             hasWebApp: !!webApp,
             hasInitDataUnsafe: !!webApp?.initDataUnsafe,
             hasInitData: !!webApp?.initData,
-            initDataLength: webApp?.initData?.length || 0
+            initDataLength: webApp?.initData?.length || 0,
+            initDataUnsafeKeys: webApp?.initDataUnsafe ? Object.keys(webApp.initDataUnsafe) : [],
+            webAppVersion: webApp?.version,
+            webAppPlatform: webApp?.platform
         });
+        
+        // Показываем сообщение пользователю
+        const userInfoCard = document.getElementById('user-info-card');
+        if (userInfoCard) {
+            const userNameEl = document.getElementById('user-name');
+            if (userNameEl) {
+                userNameEl.textContent = '⚠️ Данные не получены';
+            }
+            const subscriptionStatusEl = document.getElementById('subscription-status');
+            if (subscriptionStatusEl) {
+                subscriptionStatusEl.textContent = 'Откройте бота через команду /start, затем откройте miniapp снова';
+                subscriptionStatusEl.className = 'subscription-status-text inactive';
+            }
+        }
+        
         currentUser = {
             telegramId: null,
             firstName: 'Пользователь',
