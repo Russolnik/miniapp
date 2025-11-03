@@ -54,10 +54,11 @@ async function loadFullUserDataFromServer(telegramId, initData = null) {
                 photoUrl: serverPhotoUrl
             };
             
-            console.log('✅ Данные пользователя получены с сервера (из БД):', {
+            console.log('✅ Данные пользователя получены с сервера:', {
                 username: currentUser.username ? `@${currentUser.username}` : 'не указан',
                 firstName: currentUser.firstName,
-                hasPhoto: !!currentUser.photoUrl
+                hasPhoto: !!currentUser.photoUrl,
+                photoUrl: currentUser.photoUrl ? `***${currentUser.photoUrl.slice(-20)}` : 'отсутствует'
             });
         } else {
             // Fallback: используем текущие данные если данных нет на сервере
@@ -378,7 +379,9 @@ function updateUserUI(user, subscription) {
             img.alt = 'Аватар пользователя';
             img.className = 'user-avatar-img';
             img.onerror = function() {
-                console.error('❌ Ошибка загрузки аватара:', photoUrl);
+                // Проверяем, была ли это реальная ошибка или просто файл отсутствует
+                // Если это 404, это нормально - просто показываем инициал
+                console.log('⚠️ Аватар не загружен, используем инициал:', initial);
                 // Безопасная обработка ошибки
                 const parent = this.parentElement;
                 if (parent) {
