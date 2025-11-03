@@ -164,12 +164,22 @@ async function loadUserDataFromServer() {
         username: telegramUsername || null,
         photoUrl: telegramPhotoUrl
     };
+    
+    // Сразу показываем базовые данные из Telegram, чтобы не было "Загрузка..."
+    updateUserUI(currentUser, null);
 
     const apiUrl = await getApiUrl();
     
     try {
         // Загружаем данные пользователя и статус подписки с сервера через новый endpoint
-        const initDataForServer = tg?.initData || initData;
+        const webAppForInitData = window.Telegram?.WebApp || tg;
+        const initDataForServer = webAppForInitData?.initData || initData;
+        
+        console.log('📡 Запрос к серверу для получения статуса подписки...', {
+            telegramId: telegramId ? `***${String(telegramId).slice(-4)}` : 'не найден',
+            hasInitData: !!initDataForServer
+        });
+        
         const statusResponse = await fetch(`${apiUrl}/api/user/status`, {
             method: 'POST',
             headers: {
@@ -203,6 +213,15 @@ async function loadUserDataFromServer() {
             // Обновляем статус подписки
             if (statusData.subscription) {
                 userSubscription = statusData.subscription;
+                console.log('✅ Статус подписки получен:', {
+                    is_active: userSubscription.is_active,
+                    is_trial: userSubscription.is_trial,
+                    days_left: userSubscription.days_left,
+                    hours_left: userSubscription.hours_left
+                });
+            } else {
+                console.warn('⚠️ Подписка не найдена в ответе сервера');
+                userSubscription = null;
             }
             
             // Обновляем статус пробного периода (для информации)
@@ -210,16 +229,31 @@ async function loadUserDataFromServer() {
                 console.log('🎁 Статус пробного периода:', statusData.trial);
             }
         } else {
-            console.warn('⚠️ Ошибка получения статуса с сервера, используем данные Telegram');
+            const errorText = await statusResponse.text().catch(() => 'Неизвестная ошибка');
+            console.warn('⚠️ Ошибка получения статуса с сервера:', statusResponse.status, errorText);
+            userSubscription = null;
         }
 
     } catch (error) {
         console.error('❌ Ошибка загрузки данных с сервера:', error);
         // Продолжаем с базовыми данными из Telegram
+        userSubscription = null;
     }
 
-    updateUserUI(currentUser, userSubscription);
-    updateModeCardsAccess(userSubscription);
+    // Обновляем UI только если есть данные пользователя
+    if (currentUser && currentUser.telegramId) {
+        updateUserUI(currentUser, userSubscription);
+        updateModeCardsAccess(userSubscription);
+    } else {
+        console.error('❌ Не удалось загрузить данные пользователя');
+        // Показываем заглушку
+        updateUserUI({
+            telegramId: null,
+            firstName: 'Загрузка...',
+            username: null,
+            photoUrl: null
+        }, null);
+    }
 }
 
 // Обновление доступности карточек режимов в зависимости от подписки
