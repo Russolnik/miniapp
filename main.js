@@ -73,24 +73,53 @@ async function getApiUrl() {
 
 // Загрузка данных пользователя с сервера (упрощенная версия)
 async function loadUserDataFromServer() {
-    // ШАГ 1: Получаем telegram_id из Telegram WebApp (самый простой способ)
-    let telegramId = null;
-    
-    // Пробуем получить ID из initDataUnsafe (самый надежный способ)
+    // ШАГ 1: Получаем данные пользователя из Telegram WebApp initDataUnsafe (для UI)
     const webApp = window.Telegram?.WebApp || tg;
-    if (webApp?.initDataUnsafe?.user?.id) {
-        telegramId = webApp.initDataUnsafe.user.id;
-        console.log('✅ Telegram ID получен из initDataUnsafe:', `***${String(telegramId).slice(-4)}`);
+    let telegramId = null;
+    let telegramUser = null;
+    
+    // Получаем данные из initDataUnsafe (рекомендуемый способ согласно документации Telegram)
+    if (webApp?.initDataUnsafe?.user) {
+        telegramUser = webApp.initDataUnsafe.user;
+        telegramId = telegramUser.id;
+        
+        // Сразу показываем данные из Telegram для быстрого отображения
+        if (telegramUser) {
+            currentUser = {
+                telegramId: telegramId,
+                firstName: telegramUser.first_name || 'Пользователь',
+                username: telegramUser.username || null,
+                photoUrl: telegramUser.photo_url || null
+            };
+            // Обновляем UI сразу с данными из Telegram
+            updateUserUI(currentUser, null);
+            console.log('✅ Данные пользователя получены из initDataUnsafe:', {
+                id: `***${String(telegramId).slice(-4)}`,
+                firstName: currentUser.firstName,
+                username: currentUser.username ? `@${currentUser.username}` : 'не указан'
+            });
+        }
     } else if (webApp?.initData) {
-        // Пробуем парсить initData напрямую
+        // Fallback: парсим initData вручную
         try {
             const urlParams = new URLSearchParams(webApp.initData);
             const userStr = urlParams.get('user');
             if (userStr) {
-                const userObj = JSON.parse(userStr);
-                if (userObj.id) {
-                    telegramId = userObj.id;
-                    console.log('✅ Telegram ID получен из initData:', `***${String(telegramId).slice(-4)}`);
+                telegramUser = JSON.parse(decodeURIComponent(userStr));
+                telegramId = telegramUser.id;
+                
+                if (telegramUser) {
+                    currentUser = {
+                        telegramId: telegramId,
+                        firstName: telegramUser.first_name || 'Пользователь',
+                        username: telegramUser.username || null,
+                        photoUrl: telegramUser.photo_url || null
+                    };
+                    updateUserUI(currentUser, null);
+                    console.log('✅ Данные пользователя получены из initData:', {
+                        id: `***${String(telegramId).slice(-4)}`,
+                        firstName: currentUser.firstName
+                    });
                 }
             }
         } catch (e) {
@@ -98,9 +127,9 @@ async function loadUserDataFromServer() {
         }
     }
     
-    // Если не удалось получить ID, показываем заглушку
-    if (!telegramId) {
-        console.error('❌ Telegram ID не найден в WebApp. Показываем заглушку.');
+    // Если не удалось получить данные, показываем заглушку
+    if (!telegramId || !telegramUser) {
+        console.error('❌ Данные пользователя Telegram не найдены. Показываем заглушку.');
         currentUser = {
             telegramId: null,
             firstName: 'Пользователь',
@@ -335,12 +364,30 @@ function updateUserUI(user, subscription) {
                     statusText = '🎁 Пробный период';
                 }
             } else {
+                const trialHoursAdded = subscription.trial_hours_added || 0;
+                
                 if (daysLeft > 0) {
                     statusText = `💎 Подписка активна (${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`;
                 } else if (hoursLeft > 0) {
                     statusText = `💎 Подписка активна (${Math.floor(hoursLeft)} ч.)`;
                 } else {
                     statusText = '💎 Подписка активна';
+                }
+                
+                // Добавляем информацию о пробном периоде, если он был включен
+                if (trialHoursAdded > 0) {
+                    const trialDays = Math.floor(trialHoursAdded / 24);
+                    const trialHours = trialHoursAdded % 24;
+                    if (trialDays > 0) {
+                        statusText += `\n🎁 +${trialDays} ${trialDays === 1 ? 'день' : trialDays < 5 ? 'дня' : 'дней'}`;
+                        if (trialHours > 0) {
+                            statusText += ` ${trialHours} ч. из пробного периода`;
+                        } else {
+                            statusText += ' из пробного периода';
+                        }
+                    } else if (trialHours > 0) {
+                        statusText += `\n🎁 +${trialHours} ч. из пробного периода`;
+                    }
                 }
             }
             
